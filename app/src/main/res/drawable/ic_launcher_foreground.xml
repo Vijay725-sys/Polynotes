@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Graduation Mortarboard Cap at top -->
+    <!-- Cap Diamond -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,23 L75,32 L54,41 L33,32 Z" />
+    <!-- Cap Base Skullcap -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M43,37 L43,45 C43,48 65,48 65,45 L65,37 Z" />
+    <!-- Cap Tassel string and bead -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M70,34 L73,43 L73,48" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M71.5,48 h3 v4 h-3 z" />
+
+    <!-- Open Book / Study Notes Base -->
+    <!-- Left Page -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,48 L27,48 C25.3,48 24,49.3 24,51 L24,78 C24,79.7 25.3,81 27,81 L52,84 Z" />
+    <!-- Right Page -->
+    <path
+        android:fillColor="#EEF2FF"
+        android:pathData="M56,48 L81,48 C82.7,48 84,49.3 84,51 L84,78 C84,79.7 82.7,81 81,81 L56,84 Z" />
+
+    <!-- Spine / Center dividing binding -->
+    <path
+        android:fillColor="#6366F1"
+        android:pathData="M52,47 h4 v38 h-4 z" />
+
+    <!-- Left Page Content Lines (Technical Notes) -->
+    <path
+        android:fillColor="#C7D2FE"
+        android:pathData="M29,54 h18 v2.5 h-18 z M29,60 h18 v2.5 h-18 z M29,66 h12 v2.5 h-12 z M29,72 h15 v2.5 h-15 z" />
+
+    <!-- Right Page Content: Engineering Compass / Graph Symbol -->
+    <path
+        android:strokeColor="#6366F1"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M63,73 L70,55 L77,73" />
+    <path
+        android:strokeColor="#6366F1"
+        android:strokeWidth="1.5"
+        android:pathData="M65.5,67 L74.5,67" />
+
+    <!-- Bookmark ribbon hanging down -->
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M53,84 L53,91 L54,89.5 L55,91 L55,84 Z" />
+</vector>

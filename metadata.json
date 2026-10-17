@@ -1,0 +1,6 @@
+{
+  "name": "PolyNotes",
+  "description": "Every Subject. Every Note. One Place. Notes, practical manuals, PYQs and viva preparation for Indian Polytechnic Diploma students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

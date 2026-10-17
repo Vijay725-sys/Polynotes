@@ -1,7 +1,11 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,14 +27,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -49,7 +57,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,21 +71,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.EngineeringBranch
 import com.example.data.model.TechnicalBoard
 import com.example.data.model.UserProfile
 
+private const val POLYNOTES_WEB_SHARE_URL =
+    "https://ais-pre-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app"
+
 @Composable
 fun ProfileAboutScreen(
     userProfile: UserProfile,
     totalResourcesCount: Int,
     savedNotesCount: Int,
+    userEmail: String? = null,
     isDarkMode: Boolean = false,
     onDarkModeToggle: (Boolean) -> Unit = {},
     onEditProfileClick: () -> Unit,
     onSubmitNewResourceClick: () -> Unit,
+    onSignOutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -97,14 +110,14 @@ fun ProfileAboutScreen(
         item {
             Column {
                 Text(
-                    text = "Profile & Settings",
+                    text = "Profile & Cloud Settings",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Manage your diploma branch, appearance & legal notices",
+                    text = "Manage your diploma branch, Firebase cloud sync & web sharing",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -128,7 +141,7 @@ fun ProfileAboutScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Box(
                                 modifier = Modifier
                                     .size(56.dp)
@@ -156,13 +169,33 @@ fun ProfileAboutScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (!userEmail.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Filled.CloudDone,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = userEmail,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
                         }
 
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             IconButton(
                                 onClick = onEditProfileClick,
@@ -227,6 +260,25 @@ fun ProfileAboutScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedButton(
+                        onClick = onSignOutClick,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("sign_out_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Sign Out",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sign Out of Google Account", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -246,7 +298,7 @@ fun ProfileAboutScreen(
                 StatCard(
                     title = "Bookmarks",
                     value = "$savedNotesCount",
-                    sub = "Saved Offline",
+                    sub = "Cloud Synced",
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
@@ -255,6 +307,119 @@ fun ProfileAboutScreen(
                     sub = userProfile.board.state,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+
+        // Share Web App Link & Invite Classmates Card
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Language,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Share PolyNotes Web & App Link",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Share this link with classmates so they can open PolyNotes in any browser",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = POLYNOTES_WEB_SHARE_URL,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(
+                                        ClipData.newPlainText("PolyNotes Web Link", POLYNOTES_WEB_SHARE_URL)
+                                    )
+                                    Toast.makeText(context, "Web link copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("copy_web_link_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ContentCopy,
+                                    contentDescription = "Copy Web Link",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Button(
+                        onClick = {
+                            val shareText = "Check out PolyNotes (Every Subject. Every Note. One Place.) for UBTER Polytechnic Diploma notes, practicals, PYQs & viva prep: $POLYNOTES_WEB_SHARE_URL"
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, "Share PolyNotes Link"))
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("share_web_link_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share Web Link with Classmates", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
@@ -273,7 +438,7 @@ fun ProfileAboutScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
@@ -397,7 +562,7 @@ fun ProfileAboutScreen(
                     Text(
                         text = "• Independent Educational Platform: PolyNotes is an independent student & faculty learning resource and is NOT an official government app of UBTER Roorkee or AICTE.\n" +
                                "• Verified Public Sources: All documents link to open educational archives or the official board portal (ubter.in).\n" +
-                               "• Local Privacy First: Your saved notes and study progress are stored locally on your device.",
+                               "• Cloud & Local Privacy: Your saved notes and study progress are securely isolated per user in Firebase Cloud Firestore.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -512,7 +677,7 @@ fun ProfileAboutScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "PolyNotes v1.0.0 • Built for Indian Polytechnic Diploma Students",
+                text = "PolyNotes v1.1.0 • Cloud Synced for Indian Polytechnic Diploma Students",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -535,7 +700,7 @@ fun ProfileAboutScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "1. Local Data Storage: PolyNotes stores your bookmarked notes, revision progress, and academic profile preferences strictly on your local Android device using encrypted preferences.",
+                        text = "1. Zero-Trust Cloud Storage: PolyNotes syncs your bookmarked notes, revision progress, and academic profile preferences to Firebase Cloud Firestore under strict per-student security rules.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -762,7 +927,13 @@ fun EditProfileBottomSheet(
 
             Button(
                 onClick = {
-                    onSave(name.trim().ifEmpty { "Student" }, college.trim().ifEmpty { "Govt. Polytechnic" }, selectedBoard, selectedBranch, selectedSemester)
+                    onSave(
+                        name.trim().ifEmpty { "Student" },
+                        college.trim().ifEmpty { "Govt. Polytechnic" },
+                        selectedBoard,
+                        selectedBranch,
+                        selectedSemester
+                    )
                 },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier

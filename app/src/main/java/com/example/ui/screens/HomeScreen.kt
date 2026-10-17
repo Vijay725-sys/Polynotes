@@ -95,6 +95,7 @@ fun HomeScreen(
     onSubjectClick: (Subject) -> Unit,
     onResourceClick: (StudyResource) -> Unit,
     onBookmarkToggle: (String) -> Unit,
+    onToggleResourceCompletion: (StudyResource) -> Unit = {},
     onSubmitClick: () -> Unit,
     onViewAllResourcesClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -611,7 +612,9 @@ fun HomeScreen(
                             resource = resource,
                             isBookmarked = bookmarkedIds.contains(resource.id),
                             onBookmarkToggle = { onBookmarkToggle(resource.id) },
-                            onClick = { onResourceClick(resource) }
+                            onClick = { onResourceClick(resource) },
+                            completedTopics = completedTopics,
+                            onToggleCompletion = { onToggleResourceCompletion(resource) }
                         )
                     }
                 }

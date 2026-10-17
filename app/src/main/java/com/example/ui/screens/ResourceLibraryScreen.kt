@@ -63,6 +63,8 @@ fun ResourceLibraryScreen(
     onSubjectFilterChange: (String?) -> Unit,
     onResourceClick: (StudyResource) -> Unit,
     onBookmarkToggle: (String) -> Unit,
+    completedTopics: Set<String> = emptySet(),
+    onToggleResourceCompletion: (StudyResource) -> Unit = {},
     onResetFilters: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -348,7 +350,9 @@ fun ResourceLibraryScreen(
                     resource = resource,
                     isBookmarked = bookmarkedIds.contains(resource.id),
                     onBookmarkToggle = { onBookmarkToggle(resource.id) },
-                    onClick = { onResourceClick(resource) }
+                    onClick = { onResourceClick(resource) },
+                    completedTopics = completedTopics,
+                    onToggleCompletion = { onToggleResourceCompletion(resource) }
                 )
             }
         }

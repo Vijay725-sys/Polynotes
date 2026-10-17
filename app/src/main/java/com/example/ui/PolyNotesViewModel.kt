@@ -1,7 +1,7 @@
 package com.example.ui
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.EngineeringBranch
 import com.example.data.model.ResourceType
@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -41,12 +42,15 @@ data class UiState(
     val selectedSubjectForUnits: Subject? = null,
     val isSubmitDialogOpen: Boolean = false,
     val isFilterSheetOpen: Boolean = false,
-    val isProfileEditOpen: Boolean = false
+    val isProfileEditOpen: Boolean = false,
+    val isCloudSynced: Boolean = true,
+    val cloudError: String? = null
 )
 
-class PolyNotesViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = PolyNotesRepository(application.applicationContext)
+class PolyNotesViewModel(
+    private val repository: PolyNotesRepository,
+    private val currentUserId: String
+) : ViewModel() {
 
     val subjects: StateFlow<List<Subject>> = repository.subjects
     val allResources: StateFlow<List<StudyResource>> = repository.allResources
@@ -66,6 +70,54 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _userMessage = MutableSharedFlow<String>()
     val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
+
+    init {
+        if (currentUserId.isNotBlank()) {
+            observeCloudData()
+        }
+    }
+
+    private fun observeCloudData() {
+        // Observe user profile document & sync initial state if not yet created in cloud
+        viewModelScope.launch {
+            repository.observeUserProfileDoc(currentUserId)
+                .catch { error ->
+                    Log.w(TAG, "Error observing user profile from Firestore", error)
+                    _uiState.value = _uiState.value.copy(
+                        cloudError = error.localizedMessage ?: "Failed to sync profile"
+                    )
+                }
+                .collect { doc ->
+                    if (doc != null) {
+                        repository.applyCloudProfileSnapshot(doc)
+                        _uiState.value = _uiState.value.copy(
+                            selectedBoard = doc.toUserProfile().board,
+                            selectedBranch = doc.toUserProfile().branch,
+                            selectedSemester = doc.toUserProfile().semester,
+                            isCloudSynced = true,
+                            cloudError = null
+                        )
+                    } else {
+                        // Seed initial cloud profile document for this authenticated user
+                        repository.syncUserProfileToCloud()
+                    }
+                }
+        }
+
+        // Observe user's cloud-submitted study resources
+        viewModelScope.launch {
+            repository.observeCloudResources(currentUserId)
+                .catch { error ->
+                    Log.w(TAG, "Error observing cloud resources from Firestore", error)
+                    _uiState.value = _uiState.value.copy(
+                        cloudError = error.localizedMessage ?: "Failed to load cloud resources"
+                    )
+                }
+                .collect { cloudDocs ->
+                    repository.applyCloudResourcesSnapshot(cloudDocs)
+                }
+        }
+    }
 
     // Filtered resources for Library / Search
     val filteredResources: StateFlow<List<StudyResource>> = combine(
@@ -89,7 +141,7 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
             matchesQuery && matchesType && matchesSemester && matchesSubject
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     // Saved/Bookmarked resources list
     val savedResources: StateFlow<List<StudyResource>> = combine(
@@ -97,7 +149,7 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
         bookmarkedIds
     ) { resources, ids ->
         resources.filter { ids.contains(it.id) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     fun selectTab(tab: MainTab) {
         _uiState.value = _uiState.value.copy(
@@ -166,8 +218,9 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleBookmark(resourceId: String) {
         val isNowBookmarked = repository.toggleBookmark(resourceId)
         viewModelScope.launch {
+            repository.syncUserProfileToCloud()
             if (isNowBookmarked) {
-                _userMessage.emit("Saved to your offline study bookmarks")
+                _userMessage.emit("Saved & synced to your cloud study bookmarks")
             } else {
                 _userMessage.emit("Removed from Saved Notes")
             }
@@ -181,8 +234,21 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleTopicCompleted(topicKey: String) {
         val completed = repository.toggleTopicCompleted(topicKey)
         viewModelScope.launch {
+            repository.syncUserProfileToCloud()
             if (completed) {
-                _userMessage.emit("Topic marked as revised!")
+                _userMessage.emit("Topic marked as revised & synced to cloud!")
+            }
+        }
+    }
+
+    fun toggleResourceCompletion(resource: StudyResource) {
+        val nowCompleted = repository.toggleResourceCompletion(resource)
+        viewModelScope.launch {
+            repository.syncUserProfileToCloud()
+            if (nowCompleted) {
+                _userMessage.emit("Great job! '${resource.title}' marked 100% reviewed.")
+            } else {
+                _userMessage.emit("Revision status reset for '${resource.title}'")
             }
         }
     }
@@ -231,7 +297,22 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
         closeSubmitDialog()
         viewModelScope.launch {
-            _userMessage.emit("Resource '${newRes.title}' submitted and added to library!")
+            val cloudRes = repository.createCloudResource(
+                title = title,
+                subjectId = subjectId,
+                subjectName = subjectName,
+                unit = unit,
+                type = type,
+                documentUrl = documentUrl,
+                source = source,
+                semester = semester,
+                description = description
+            )
+            if (cloudRes.isSuccess) {
+                _userMessage.emit("Resource '${newRes.title}' synced to Firebase Cloud Library!")
+            } else {
+                _userMessage.emit("Resource '${newRes.title}' saved locally!")
+            }
         }
         return true
     }
@@ -251,7 +332,12 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
             isProfileEditOpen = false
         )
         viewModelScope.launch {
-            _userMessage.emit("Academic profile updated")
+            val result = repository.syncUserProfileToCloud()
+            if (result.isSuccess) {
+                _userMessage.emit("Academic profile updated & synced to Firebase Cloud")
+            } else {
+                _userMessage.emit("Academic profile updated locally")
+            }
         }
     }
 
@@ -276,5 +362,10 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
             }
             else -> false
         }
+    }
+
+    private companion object {
+        const val TAG = "PolyNotesVM"
+        const val STOP_TIMEOUT_MILLIS = 5000L
     }
 }

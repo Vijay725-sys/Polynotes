@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,8 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.HistoryEdu
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -38,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,13 +48,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,9 +92,16 @@ fun ResourceCard(
     isBookmarked: Boolean,
     onBookmarkToggle: () -> Unit,
     onClick: () -> Unit,
+    completedTopics: Set<String> = emptySet(),
+    onToggleCompletion: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+
+    val totalTopics = resource.topicsCovered.size.coerceAtLeast(1)
+    val completedCount = resource.topicsCovered.count { completedTopics.contains(it) }
+    val completionFraction = (completedCount.toFloat() / totalTopics.toFloat()).coerceIn(0f, 1f)
+    val isFullyCompleted = completedCount >= totalTopics && resource.topicsCovered.isNotEmpty()
 
     Card(
         modifier = modifier
@@ -100,14 +114,17 @@ fun ResourceCard(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(
+            width = if (isFullyCompleted) 1.5.dp else 1.dp,
+            color = if (isFullyCompleted) VerifiedGreen.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Top Row: Type Badge + Review Status + Bookmark Icon
+            // Top Row: Type Badge + Review Status + Circular Progress Ring + Bookmark Icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -115,33 +132,47 @@ fun ResourceCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     ResourceTypeBadge(type = resource.type)
                     ReviewStatusChip(status = resource.reviewStatus)
                 }
 
-                Surface(
-                    shape = CircleShape,
-                    color = if (isBookmarked) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                    },
-                    modifier = Modifier.size(36.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    IconButton(
-                        onClick = onBookmarkToggle,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .testTag("bookmark_btn_${resource.id}")
+                    // Circular Progress Indicator for Completion Status
+                    ResourceCompletionIndicator(
+                        resourceId = resource.id,
+                        completionFraction = completionFraction,
+                        isFullyCompleted = isFullyCompleted,
+                        onClick = onToggleCompletion
+                    )
+
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isBookmarked) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        },
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = if (isBookmarked) "Remove from bookmarks" else "Save to bookmarks",
-                            tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        IconButton(
+                            onClick = onBookmarkToggle,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("bookmark_btn_${resource.id}")
+                        ) {
+                            Icon(
+                                imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = if (isBookmarked) "Remove from bookmarks" else "Save to bookmarks",
+                                tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -160,16 +191,20 @@ fun ResourceCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Subject, Unit & Semester Metadata Row
+            // Subject, Unit, Semester & Completion Status Pill Row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = resource.subjectName,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 Box(
                     modifier = Modifier
@@ -194,14 +229,33 @@ fun ResourceCard(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.outlineVariant)
                 )
-                Text(
-                    text = "Sem ${resource.semester}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = when {
+                        isFullyCompleted -> VerifiedGreenBg
+                        completedCount > 0 -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    }
+                ) {
+                    Text(
+                        text = when {
+                            isFullyCompleted -> "Completed ($completedCount/$totalTopics)"
+                            completedCount > 0 -> "$completedCount/$totalTopics Reviewed"
+                            else -> "0/$totalTopics Reviewed"
+                        },
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        fontWeight = FontWeight.SemiBold,
+                        color = when {
+                            isFullyCompleted -> VerifiedGreen
+                            completedCount > 0 -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                    )
+                }
             }
 
-            // Topics Tags
+            // Topics Tags (highlighting completed topics)
             if (resource.topicsCovered.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 FlowRow(
@@ -210,19 +264,41 @@ fun ResourceCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     resource.topicsCovered.take(2).forEach { topic ->
+                        val isTopicDone = completedTopics.contains(topic)
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f))
-                        ) {
-                            Text(
-                                text = topic,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            color = if (isTopicDone) {
+                                VerifiedGreenBg.copy(alpha = 0.65f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                            border = BorderStroke(
+                                width = 0.5.dp,
+                                color = if (isTopicDone) VerifiedGreen.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                             )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                if (isTopicDone) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = VerifiedGreen,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                Text(
+                                    text = topic,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = if (isTopicDone) VerifiedGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (isTopicDone) FontWeight.Medium else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -284,6 +360,90 @@ fun ResourceCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun ResourceCompletionIndicator(
+    resourceId: String,
+    completionFraction: Float,
+    isFullyCompleted: Boolean,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = completionFraction,
+        animationSpec = tween(durationMillis = 450),
+        label = "resource_completion_progress"
+    )
+    val percentage = (completionFraction * 100).toInt()
+    val progressColor = if (isFullyCompleted) VerifiedGreen else MaterialTheme.colorScheme.primary
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(
+                if (isFullyCompleted) {
+                    VerifiedGreenBg.copy(alpha = 0.7f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                }
+            )
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            )
+            .semantics {
+                contentDescription = "Completion status $percentage percent"
+            }
+            .testTag("completion_ring_$resourceId")
+    ) {
+        // Background track ring
+        CircularProgressIndicator(
+            progress = { 1f },
+            modifier = Modifier.size(34.dp),
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+            strokeWidth = 3.dp,
+            trackColor = Color.Transparent
+        )
+
+        // Foreground animated progress ring
+        CircularProgressIndicator(
+            progress = { animatedProgress },
+            modifier = Modifier.size(34.dp),
+            color = progressColor,
+            strokeWidth = 3.dp,
+            trackColor = Color.Transparent,
+            strokeCap = StrokeCap.Round
+        )
+
+        if (isFullyCompleted) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = "Completed",
+                tint = VerifiedGreen,
+                modifier = Modifier.size(16.dp)
+            )
+        } else {
+            Text(
+                text = "$percentage%",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.sp,
+                    letterSpacing = (-0.2).sp
+                ),
+                fontWeight = FontWeight.ExtraBold,
+                color = if (percentage > 0) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
     }
 }

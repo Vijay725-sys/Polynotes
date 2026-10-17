@@ -1,11 +1,11 @@
 package com.example
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,17 +37,29 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.data.repository.PolyNotesRepository
 import com.example.ui.MainTab
 import com.example.ui.PolyNotesViewModel
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.EditProfileBottomSheet
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ProfileAboutScreen
@@ -57,28 +69,96 @@ import com.example.ui.screens.SavedNotesScreen
 import com.example.ui.screens.SubjectDetailView
 import com.example.ui.screens.SubjectsScreen
 import com.example.ui.screens.SubmitResourceBottomSheet
+import com.example.ui.screens.signOut
 import com.example.ui.theme.PolyNotesTheme
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {
-
-    private val viewModel: PolyNotesViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-            val isDarkMode by viewModel.isDarkMode.collectAsState()
-            PolyNotesTheme(darkTheme = isDarkMode) {
-                PolyNotesApp(viewModel = viewModel)
-            }
+            AppContent()
         }
     }
 }
 
 @Composable
-fun PolyNotesApp(viewModel: PolyNotesViewModel) {
+fun AppContent() {
+    var currentUser by remember { mutableStateOf(Firebase.auth.currentUser) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember(context) { CredentialManager.create(context) }
+
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        Firebase.auth.addAuthStateListener(listener)
+        onDispose {
+            Firebase.auth.removeAuthStateListener(listener)
+        }
+    }
+
+    val user = currentUser
+    if (user == null) {
+        PolyNotesTheme(darkTheme = false) {
+            AuthScreen(
+                onAuthSuccess = {
+                    currentUser = Firebase.auth.currentUser
+                }
+            )
+        }
+    } else {
+        val viewModel: PolyNotesViewModel = viewModel(
+            key = user.uid,
+            factory = viewModelFactory {
+                initializer {
+                    val app = checkNotNull(this[APPLICATION_KEY]) {
+                        "APPLICATION_KEY missing from CreationExtras"
+                    }
+                    val databaseId = app.getString(R.string.firestore_database_id)
+                    val db = FirebaseFirestore.getInstance(databaseId)
+                    val prefs = app.getSharedPreferences("polynotes_prefs", Context.MODE_PRIVATE)
+                    PolyNotesViewModel(
+                        repository = PolyNotesRepository(db = db, prefs = prefs),
+                        currentUserId = user.uid
+                    )
+                }
+            }
+        )
+        val isDarkMode by viewModel.isDarkMode.collectAsState()
+        PolyNotesTheme(darkTheme = isDarkMode) {
+            PolyNotesApp(
+                viewModel = viewModel,
+                userEmail = user.email,
+                onSignOut = {
+                    signOut(
+                        context = context,
+                        credentialManager = credentialManager,
+                        onSignOutComplete = {
+                            currentUser = null
+                        },
+                        scope = coroutineScope
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun PolyNotesApp(
+    viewModel: PolyNotesViewModel,
+    userEmail: String? = null,
+    onSignOut: () -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
     val allResources by viewModel.allResources.collectAsState()
@@ -223,6 +303,7 @@ fun PolyNotesApp(viewModel: PolyNotesViewModel) {
                                         viewModel.openResourceDetail(resource)
                                     },
                                     onBookmarkToggle = { id -> viewModel.toggleBookmark(id) },
+                                    onToggleResourceCompletion = { res -> viewModel.toggleResourceCompletion(res) },
                                     onSubmitClick = { viewModel.openSubmitDialog() },
                                     onViewAllResourcesClick = { viewModel.selectTab(MainTab.LIBRARY) }
                                 )
@@ -253,6 +334,8 @@ fun PolyNotesApp(viewModel: PolyNotesViewModel) {
                                     onSubjectFilterChange = { subId -> viewModel.setSubjectFilter(subId) },
                                     onResourceClick = { res -> viewModel.openResourceDetail(res) },
                                     onBookmarkToggle = { id -> viewModel.toggleBookmark(id) },
+                                    completedTopics = completedTopics,
+                                    onToggleResourceCompletion = { res -> viewModel.toggleResourceCompletion(res) },
                                     onResetFilters = {
                                         viewModel.onSearchQueryChanged("")
                                         viewModel.setResourceTypeFilter(null)
@@ -267,6 +350,8 @@ fun PolyNotesApp(viewModel: PolyNotesViewModel) {
                                     savedResources = savedResources,
                                     onResourceClick = { res -> viewModel.openResourceDetail(res) },
                                     onBookmarkToggle = { id -> viewModel.toggleBookmark(id) },
+                                    completedTopics = completedTopics,
+                                    onToggleResourceCompletion = { res -> viewModel.toggleResourceCompletion(res) },
                                     onExploreLibraryClick = { viewModel.selectTab(MainTab.LIBRARY) }
                                 )
                             }
@@ -276,10 +361,12 @@ fun PolyNotesApp(viewModel: PolyNotesViewModel) {
                                     userProfile = userProfile,
                                     totalResourcesCount = allResources.size,
                                     savedNotesCount = savedResources.size,
+                                    userEmail = userEmail,
                                     isDarkMode = isDarkMode,
                                     onDarkModeToggle = { enabled -> viewModel.setDarkMode(enabled) },
                                     onEditProfileClick = { viewModel.toggleProfileEdit(true) },
-                                    onSubmitNewResourceClick = { viewModel.openSubmitDialog() }
+                                    onSubmitNewResourceClick = { viewModel.openSubmitDialog() },
+                                    onSignOutClick = onSignOut
                                 )
                             }
                         }

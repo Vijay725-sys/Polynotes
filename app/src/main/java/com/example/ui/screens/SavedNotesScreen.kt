@@ -50,6 +50,8 @@ fun SavedNotesScreen(
     savedResources: List<StudyResource>,
     onResourceClick: (StudyResource) -> Unit,
     onBookmarkToggle: (String) -> Unit,
+    completedTopics: Set<String> = emptySet(),
+    onToggleResourceCompletion: (StudyResource) -> Unit = {},
     onExploreLibraryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -226,7 +228,9 @@ fun SavedNotesScreen(
                     resource = resource,
                     isBookmarked = true,
                     onBookmarkToggle = { onBookmarkToggle(resource.id) },
-                    onClick = { onResourceClick(resource) }
+                    onClick = { onResourceClick(resource) },
+                    completedTopics = completedTopics,
+                    onToggleCompletion = { onToggleResourceCompletion(resource) }
                 )
             }
         }

@@ -1,6 +1,8 @@
 package com.example
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -11,22 +13,30 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -35,7 +45,9 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,7 +56,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -61,6 +75,7 @@ import com.example.ui.MainTab
 import com.example.ui.PolyNotesViewModel
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.EditProfileBottomSheet
+import com.example.ui.screens.FullScreenWebAppScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ProfileAboutScreen
 import com.example.ui.screens.ResourceDetailView
@@ -77,6 +92,9 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.collectLatest
 
+private const val EXTERNAL_WEB_URL =
+    "https://ais-pre-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app"
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,6 +110,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppContent() {
     var currentUser by remember { mutableStateOf(Firebase.auth.currentUser) }
+    var isFullScreenWebMode by rememberSaveable { mutableStateOf(true) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
@@ -134,21 +153,33 @@ fun AppContent() {
             }
         )
         val isDarkMode by viewModel.isDarkMode.collectAsState()
-        PolyNotesTheme(darkTheme = isDarkMode) {
-            PolyNotesApp(
-                viewModel = viewModel,
-                userEmail = user.email,
-                onSignOut = {
-                    signOut(
-                        context = context,
-                        credentialManager = credentialManager,
-                        onSignOutComplete = {
-                            currentUser = null
-                        },
-                        scope = coroutineScope
-                    )
-                }
+        val handleSignOut: () -> Unit = {
+            signOut(
+                context = context,
+                credentialManager = credentialManager,
+                onSignOutComplete = {
+                    currentUser = null
+                },
+                scope = coroutineScope
             )
+        }
+
+        PolyNotesTheme(darkTheme = isDarkMode) {
+            if (isFullScreenWebMode) {
+                FullScreenWebAppScreen(
+                    viewModel = viewModel,
+                    userEmail = user.email,
+                    onSwitchToNativeUi = { isFullScreenWebMode = false },
+                    onSignOut = handleSignOut
+                )
+            } else {
+                PolyNotesApp(
+                    viewModel = viewModel,
+                    userEmail = user.email,
+                    onOpenFullScreenWebMode = { isFullScreenWebMode = true },
+                    onSignOut = handleSignOut
+                )
+            }
         }
     }
 }
@@ -157,8 +188,10 @@ fun AppContent() {
 fun PolyNotesApp(
     viewModel: PolyNotesViewModel,
     userEmail: String? = null,
+    onOpenFullScreenWebMode: () -> Unit = {},
     onSignOut: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
     val allResources by viewModel.allResources.collectAsState()
@@ -184,6 +217,50 @@ fun PolyNotesApp(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        floatingActionButton = {
+            if (uiState.selectedResourceForDetail == null && uiState.selectedSubjectForUnits == null) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shadowElevation = 6.dp
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        TextButton(
+                            onClick = onOpenFullScreenWebMode,
+                            modifier = Modifier.testTag("open_fullscreen_web_mode_fab")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Language,
+                                contentDescription = "Full-Screen Web App View",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Full-Screen Web View",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(EXTERNAL_WEB_URL))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.testTag("launch_external_browser_fab")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = "Open in External Browser",
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
         bottomBar = {
             if (uiState.selectedResourceForDetail == null && uiState.selectedSubjectForUnits == null) {
                 NavigationBar(

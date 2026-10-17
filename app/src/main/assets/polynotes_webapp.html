@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>PolyNotes — Every Subject. Every Note. One Place.</title>
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --surface-alt: #F1F5F9;
+      --text-main: #0F172A;
+      --text-sub: #475569;
+      --text-muted: #64748B;
+      --primary: #4F46E5;
+      --primary-light: #6366F1;
+      --primary-soft: #EEF2FF;
+      --accent-amber: #F59E0B;
+      --emerald: #10B981;
+      --emerald-soft: #ECFDF5;
+      --border: #E2E8F0;
+      --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+    }
+
+    body.dark {
+      --bg: #0B0F19;
+      --surface: #111827;
+      --surface-alt: #1E293B;
+      --text-main: #F8FAFC;
+      --text-sub: #CBD5E1;
+      --text-muted: #94A3B8;
+      --primary: #6366F1;
+      --primary-light: #818CF8;
+      --primary-soft: rgba(99, 102, 241, 0.16);
+      --emerald: #34D399;
+      --emerald-soft: rgba(16, 185, 129, 0.15);
+      --border: #1E293B;
+      --shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 84px;
+      overflow-x: hidden;
+    }
+
+    /* Sticky Web App Browser Header */
+    .web-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1E1B4B, #4F46E5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FBBF24;
+      font-weight: 800;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.3px;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-pill-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text-main);
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .icon-pill-btn.primary {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* Hero Banner */
+    .hero-card {
+      background: linear-gradient(135deg, #1E1B4B 0%, #312E81 55%, #4F46E5 100%);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      color: #FFFFFF;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.14);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .hero-card h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .hero-card p {
+      font-size: 13px;
+      color: #E0E7FF;
+      margin-bottom: 14px;
+    }
+
+    /* Search Bar */
+    .search-box {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 13px 16px 13px 40px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      box-shadow: var(--shadow);
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+
+    /* Horizontal Chips */
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 14px;
+      scrollbar-width: none;
+    }
+    .chip-row::-webkit-scrollbar { display: none; }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sub);
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .chip.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+
+    /* Quick Category Grid */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .cat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 6px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+    }
+
+    .cat-icon {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+
+    .cat-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* Section Header */
+    .section-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 16px 0 10px;
+    }
+
+    .section-hdr h2 {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Resource Card */
+    .res-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s ease;
+    }
+
+    .res-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .badge-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .type-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 6px;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--emerald-soft);
+      color: var(--emerald);
+    }
+
+    .res-actions-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Circular Progress Ring */
+    .progress-ring-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: none;
+      background: var(--surface-alt);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .progress-ring-text {
+      position: absolute;
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .bookmark-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .res-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+
+    .res-meta {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .res-desc {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .res-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-sm {
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text-main);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-sm.primary {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+
+    /* Subject Card */
+    .subj-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+
+    .unit-box {
+      background: var(--surface-alt);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 8px;
+    }
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+      z-index: 100;
+    }
+
+    .nav-item {
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+      font-weight: 800;
+      background: var(--primary-soft);
+    }
+
+    .nav-icon {
+      font-size: 18px;
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      z-index: 200;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-sheet {
+      background: var(--surface);
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      border-radius: 22px 22px 0 0;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text-main);
+      font-size: 14px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1E1B4B;
+      color: #FFFFFF;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 700;
+      z-index: 300;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Web App Bar -->
+  <header class="web-topbar">
+    <div class="brand-row">
+      <div class="brand-logo">P</div>
+      <div>
+        <div class="brand-title">PolyNotes Web</div>
+        <div class="brand-subtitle">UBTER Civil Engineering • Cloud Synced</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-pill-btn" onclick="openSubmitModal()" title="Submit Note">+ Submit</button>
+      <button class="icon-pill-btn primary" onclick="openCurrentInExternalBrowser()" title="Open in External Browser">↗ Browser</button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="container" id="app-content"></main>
+
+  <!-- Resource Detail & In-App Document Reader Modal -->
+  <div class="modal-backdrop" id="detail-modal">
+    <div class="modal-sheet" id="detail-modal-body"></div>
+  </div>
+
+  <!-- Submit Resource Modal -->
+  <div class="modal-backdrop" id="submit-modal">
+    <div class="modal-sheet">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="font-size:18px;font-weight:800;">Submit Study Resource</h3>
+        <button class="btn-sm" onclick="closeSubmitModal()">✕ Close</button>
+      </div>
+      <div class="form-group">
+        <label>Resource Title *</label>
+        <input id="sub-title" class="form-control" placeholder="e.g., Unit 3 Concrete Mix Design Notes" />
+      </div>
+      <div class="form-group">
+        <label>Subject *</label>
+        <select id="sub-subject" class="form-control"></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label>Unit (1-6) *</label>
+          <input id="sub-unit" type="number" min="1" max="6" value="1" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Category *</label>
+          <select id="sub-type" class="form-control">
+            <option value="NOTES">Notes</option>
+            <option value="PRACTICALS">Practicals</option>
+            <option value="PYQS">PYQs</option>
+            <option value="VIVA">Viva Voce</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Document / PDF URL (https://...) *</label>
+        <input id="sub-url" class="form-control" placeholder="https://www.ubter.in or Google Drive PDF link" />
+      </div>
+      <div class="form-group">
+        <label>Contributor / Source</label>
+        <input id="sub-source" class="form-control" placeholder="e.g., Govt. Polytechnic Dehradun" />
+      </div>
+      <div class="form-group">
+        <label>Topics Summary</label>
+        <input id="sub-desc" class="form-control" placeholder="Brief summary of syllabus topics covered" />
+      </div>
+      <div id="sub-error" style="color:#EF4444;font-size:12px;font-weight:700;margin-bottom:10px;display:none;"></div>
+      <button class="btn-sm primary" style="width:100%;justify-content:center;padding:12px;" onclick="handleResourceSubmit()">Submit & Sync to Cloud</button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast-msg"></div>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-HOME" onclick="switchTab('HOME')">
+      <span class="nav-icon">🏠</span>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" id="nav-SUBJECTS" onclick="switchTab('SUBJECTS')">
+      <span class="nav-icon">📚</span>
+      <span>Subjects</span>
+    </button>
+    <button class="nav-item" id="nav-LIBRARY" onclick="switchTab('LIBRARY')">
+      <span class="nav-icon">🔍</span>
+      <span>Library</span>
+    </button>
+    <button class="nav-item" id="nav-SAVED" onclick="switchTab('SAVED')">
+      <span class="nav-icon">🔖</span>
+      <span>Saved</span>
+    </button>
+    <button class="nav-item" id="nav-PROFILE" onclick="switchTab('PROFILE')">
+      <span class="nav-icon">👤</span>
+      <span>Profile</span>
+    </button>
+  </nav>
+
+  <script>
+    const WEB_SHARE_URL = "https://ais-pre-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app";
+
+    let state = {
+      currentTab: "HOME",
+      selectedSemester: 0,
+      selectedType: "ALL",
+      selectedSubjectId: "ALL",
+      searchQuery: "",
+      darkMode: false,
+      userEmail: "",
+      userProfile: {
+        name: "Rahul Sharma",
+        college: "Govt. Polytechnic Dehradun",
+        board: "UBTER",
+        branch: "CIVIL",
+        semester: 3
+      },
+      bookmarkedIds: ["res_01", "res_07", "res_15"],
+      completedTopics: [
+        "Surveying Fundamental Principles",
+        "Pull, Temperature & Sag Corrections",
+        "IS 10262 Step-by-Step Flowchart"
+      ],
+      subjects: [],
+      resources: []
+    };
+
+    function showToast(msg) {
+      const el = document.getElementById("toast-msg");
+      el.textContent = msg;
+      el.style.display = "block";
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => { el.style.display = "none"; }, 2600);
+    }
+
+    function syncFromAndroidBridge() {
+      if (window.PolyNotesBridge && window.PolyNotesBridge.getStateJson) {
+        try {
+          const raw = window.PolyNotesBridge.getStateJson();
+          const data = JSON.parse(raw);
+          state.userProfile = data.userProfile || state.userProfile;
+          state.userEmail = data.userEmail || "";
+          state.darkMode = !!data.isDarkMode;
+          state.bookmarkedIds = data.bookmarkedIds || [];
+          state.completedTopics = data.completedTopics || [];
+          state.subjects = data.subjects || [];
+          state.resources = data.resources || [];
+          document.body.classList.toggle("dark", state.darkMode);
+        } catch (e) {
+          console.error("Bridge sync error", e);
+        }
+      }
+      render();
+    }
+
+    window.onAndroidStateUpdated = function() {
+      syncFromAndroidBridge();
+    };
+
+    function switchTab(tab) {
+      state.currentTab = tab;
+      ["HOME", "SUBJECTS", "LIBRARY", "SAVED", "PROFILE"].forEach(t => {
+        const btn = document.getElementById("nav-" + t);
+        if (btn) btn.classList.toggle("active", t === tab);
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      render();
+    }
+
+    function getResourceCompletionPercent(res) {
+      const topics = res.topicsCovered || [];
+      if (!topics.length) return 0;
+      const done = topics.filter(t => state.completedTopics.includes(t)).length;
+      return Math.round((done / topics.length) * 100);
+    }
+
+    function toggleBookmark(resId, ev) {
+      if (ev) ev.stopPropagation();
+      if (window.PolyNotesBridge && window.PolyNotesBridge.toggleBookmark) {
+        window.PolyNotesBridge.toggleBookmark(resId);
+        syncFromAndroidBridge();
+      } else {
+        const idx = state.bookmarkedIds.indexOf(resId);
+        if (idx >= 0) state.bookmarkedIds.splice(idx, 1);
+        else state.bookmarkedIds.push(resId);
+        render();
+      }
+      showToast(state.bookmarkedIds.includes(resId) ? "Saved to Cloud Bookmarks" : "Removed from Saved Notes");
+    }
+
+    function toggleResourceCompletion(resId, ev) {
+      if (ev) ev.stopPropagation();
+      if (window.PolyNotesBridge && window.PolyNotesBridge.toggleResourceCompletion) {
+        window.PolyNotesBridge.toggleResourceCompletion(resId);
+        syncFromAndroidBridge();
+        showToast("Updated revision completion progress!");
+      }
+    }
+
+    function toggleTopic(topic) {
+      if (window.PolyNotesBridge && window.PolyNotesBridge.toggleTopicCompleted) {
+        window.PolyNotesBridge.toggleTopicCompleted(topic);
+        syncFromAndroidBridge();
+        if (window._activeDetailId) openResourceDetail(window._activeDetailId);
+      }
+    }
+
+    function openExternalUrl(url, ev) {
+      if (ev) ev.stopPropagation();
+      if (window.PolyNotesBridge && window.PolyNotesBridge.openExternalBrowser) {
+        window.PolyNotesBridge.openExternalBrowser(url);
+      } else {
+        window.open(url, "_blank");
+      }
+    }
+
+    function openCurrentInExternalBrowser() {
+      openExternalUrl(WEB_SHARE_URL);
+    }
+
+    function shareAppLink() {
+      if (window.PolyNotesBridge && window.PolyNotesBridge.shareWebLink) {
+        window.PolyNotesBridge.shareWebLink(WEB_SHARE_URL);
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(WEB_SHARE_URL);
+        showToast("PolyNotes Web Link copied!");
+      }
+    }
+
+    function toggleDarkTheme() {
+      const next = !state.darkMode;
+      if (window.PolyNotesBridge && window.PolyNotesBridge.setDarkMode) {
+        window.PolyNotesBridge.setDarkMode(next);
+      }
+      state.darkMode = next;
+      document.body.classList.toggle("dark", next);
+      render();
+    }
+
+    function renderProgressRing(res) {
+      const pct = getResourceCompletionPercent(res);
+      const radius = 14;
+      const circ = 2 * Math.PI * radius;
+      const offset = circ - (pct / 100) * circ;
+      const strokeColor = pct === 100 ? "#10B981" : "#4F46E5";
+      return `
+        <button class="progress-ring-btn" onclick="toggleResourceCompletion('${res.id}', event)" title="Completion: ${pct}%">
+          <svg width="34" height="34" style="transform: rotate(-90deg);">
+            <circle cx="17" cy="17" r="${radius}" stroke="#E2E8F0" stroke-width="3" fill="transparent"/>
+            <circle cx="17" cy="17" r="${radius}" stroke="${strokeColor}" stroke-width="3" fill="transparent"
+              stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+          </svg>
+          <span class="progress-ring-text">${pct === 100 ? "✓" : pct + "%"}</span>
+        </button>
+      `;
+    }
+
+    function renderResourceCard(res) {
+      const isSaved = state.bookmarkedIds.includes(res.id);
+      return `
+        <div class="res-card" onclick="openResourceDetail('${res.id}')">
+          <div class="res-top">
+            <div class="badge-group">
+              <span class="type-badge">${res.typeLabel || res.type}</span>
+              <span class="status-badge">✓ ${res.reviewStatusLabel || "Verified"}</span>
+              <span style="font-size:11px;font-weight:700;color:var(--text-muted);">Sem ${res.semester} • Unit ${res.unit}</span>
+            </div>
+            <div class="res-actions-right">
+              ${renderProgressRing(res)}
+              <button class="bookmark-btn" onclick="toggleBookmark('${res.id}', event)" title="Bookmark">
+                ${isSaved ? "🔖" : "☆"}
+              </button>
+            </div>
+          </div>
+          <div class="res-title">${res.title}</div>
+          <div class="res-meta">${res.subjectName} • ${res.source}</div>
+          <div class="res-desc">${res.description}</div>
+          <div class="res-footer">
+            <span style="font-size:11px;font-weight:700;color:var(--text-muted);">📄 ${res.pageCountOrLength} • ${res.uploadedAt}</span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-sm" onclick="openResourceDetail('${res.id}'); event.stopPropagation();">Read In-App</button>
+              <button class="btn-sm primary" onclick="openExternalUrl('${res.documentUrl}', event)">↗ External Browser</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function openResourceDetail(resId) {
+      const res = state.resources.find(r => r.id === resId);
+      if (!res) return;
+      window._activeDetailId = resId;
+      const isSaved = state.bookmarkedIds.includes(res.id);
+      const pct = getResourceCompletionPercent(res);
+      const topicsHtml = (res.topicsCovered || []).map(t => {
+        const done = state.completedTopics.includes(t);
+        return `
+          <div onclick="toggleTopic('${t.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:var(--surface-alt);margin-bottom:6px;cursor:pointer;">
+            <span style="font-size:16px;">${done ? "✅" : "⬜"}</span>
+            <span style="font-size:13px;font-weight:600;${done ? "text-decoration:line-through;color:var(--text-muted);" : ""}">${t}</span>
+          </div>
+        `;
+      }).join("");
+
+      const body = document.getElementById("detail-modal-body");
+      body.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span class="type-badge">${res.typeLabel || res.type} • Sem ${res.semester} Unit ${res.unit}</span>
+          <button class="btn-sm" onclick="closeDetailModal()">✕ Close</button>
+        </div>
+        <h3 style="font-size:19px;font-weight:800;margin-bottom:6px;">${res.title}</h3>
+        <p style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px;">${res.subjectName} • Source: ${res.source}</p>
+        <p style="font-size:13px;color:var(--text-sub);margin-bottom:14px;">${res.description}</p>
+
+        <div style="background:var(--primary-soft);padding:12px 14px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:12px;font-weight:800;color:var(--primary);">Revision Progress: ${pct}% Complete</div>
+            <div style="font-size:11px;color:var(--text-sub);">Tap topics below to mark them reviewed</div>
+          </div>
+          <button class="btn-sm primary" onclick="toggleResourceCompletion('${res.id}', event); openResourceDetail('${res.id}');">
+            ${pct === 100 ? "Reset" : "Mark 100%"}
+          </button>
+        </div>
+
+        <h4 style="font-size:13px;font-weight:800;margin-bottom:8px;">Syllabus Topics Covered</h4>
+        <div style="margin-bottom:16px;">${topicsHtml}</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button class="btn-sm" style="justify-content:center;padding:12px;" onclick="toggleBookmark('${res.id}', event); openResourceDetail('${res.id}');">
+            ${isSaved ? "🔖 Bookmarked" : "☆ Save Note"}
+          </button>
+          <button class="btn-sm primary" style="justify-content:center;padding:12px;" onclick="openExternalUrl('${res.documentUrl}', event)">
+            ↗ Open in External Browser
+          </button>
+        </div>
+      `;
+      document.getElementById("detail-modal").classList.add("open");
+    }
+
+    function closeDetailModal() {
+      window._activeDetailId = null;
+      document.getElementById("detail-modal").classList.remove("open");
+    }
+
+    function openSubmitModal() {
+      const sel = document.getElementById("sub-subject");
+      sel.innerHTML = state.subjects.map(s => `<option value="${s.id}" data-name="${s.name}" data-sem="${s.semester}">Sem ${s.semester} - ${s.name}</option>`).join("");
+      document.getElementById("sub-error").style.display = "none";
+      document.getElementById("submit-modal").classList.add("open");
+    }
+
+    function closeSubmitModal() {
+      document.getElementById("submit-modal").classList.remove("open");
+    }
+
+    function handleResourceSubmit() {
+      const title = document.getElementById("sub-title").value.trim();
+      const sel = document.getElementById("sub-subject");
+      const opt = sel.options[sel.selectedIndex];
+      const subjectId = sel.value || "ubter_ce_301";
+      const subjectName = opt ? opt.getAttribute("data-name") : "Basic Surveying";
+      const sem = opt ? parseInt(opt.getAttribute("data-sem") || "3", 10) : 3;
+      const unit = parseInt(document.getElementById("sub-unit").value || "1", 10);
+      const type = document.getElementById("sub-type").value;
+      const url = document.getElementById("sub-url").value.trim();
+      const source = document.getElementById("sub-source").value.trim() || "Student Contributor";
+      const desc = document.getElementById("sub-desc").value.trim() || "Community study notes.";
+
+      const errEl = document.getElementById("sub-error");
+      if (title.length < 4) {
+        errEl.textContent = "Please enter a resource title (at least 4 characters).";
+        errEl.style.display = "block";
+        return;
+      }
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        errEl.textContent = "Please enter a valid URL starting with https:// or http://";
+        errEl.style.display = "block";
+        return;
+      }
+
+      if (window.PolyNotesBridge && window.PolyNotesBridge.submitResource) {
+        window.PolyNotesBridge.submitResource(title, subjectId, subjectName, unit, type, url, source, sem, desc);
+        closeSubmitModal();
+        syncFromAndroidBridge();
+        showToast("Resource submitted & synced to Firebase Cloud!");
+      }
+    }
+
+    function renderHome() {
+      const semChips = [0, 1, 2, 3, 4, 5, 6].map(sem => `
+        <button class="chip ${state.selectedSemester === sem ? 'active' : ''}"
+          onclick="state.selectedSemester=${sem}; render();">
+          ${sem === 0 ? "All Semesters" : "Semester " + sem}
+        </button>
+      `).join("");
+
+      const filteredSubjects = state.subjects.filter(s => state.selectedSemester === 0 || s.semester === state.selectedSemester);
+      const recent = state.resources
+        .filter(r => state.selectedSemester === 0 || r.semester === state.selectedSemester)
+        .slice(0, 6);
+
+      return `
+        <div class="hero-card">
+          <div class="hero-badge">🎓 ${state.userProfile.board} • ${state.userProfile.branch} DIPLOMA</div>
+          <h1>Namaste, ${state.userProfile.name}!</h1>
+          <p>Every Subject. Every Note. One Place. — Full-Screen Web & Cloud Study Portal</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-sm" style="background:#FFFFFF;color:#1E1B4B;border:none;" onclick="shareAppLink()">🔗 Share Web App Link</button>
+            <button class="btn-sm" style="background:rgba(255,255,255,0.16);color:#FFFFFF;border:1px solid rgba(255,255,255,0.25);" onclick="openExternalUrl('https://www.ubter.in', event)">🌐 Official UBTER Portal</button>
+          </div>
+        </div>
+
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" placeholder="Search notes, PYQs, surveying, concrete, viva..."
+            value="${state.searchQuery}"
+            oninput="state.searchQuery=this.value; state.currentTab='LIBRARY'; switchTab('LIBRARY');" />
+        </div>
+
+        <div class="chip-row">${semChips}</div>
+
+        <div class="cat-grid">
+          <div class="cat-card" onclick="state.selectedType='NOTES'; switchTab('LIBRARY');">
+            <div class="cat-icon">📄</div>
+            <div class="cat-label">Notes</div>
+          </div>
+          <div class="cat-card" onclick="state.selectedType='PRACTICALS'; switchTab('LIBRARY');">
+            <div class="cat-icon">🔬</div>
+            <div class="cat-label">Practicals</div>
+          </div>
+          <div class="cat-card" onclick="state.selectedType='PYQS'; switchTab('LIBRARY');">
+            <div class="cat-icon">📑</div>
+            <div class="cat-label">Solved PYQs</div>
+          </div>
+          <div class="cat-card" onclick="state.selectedType='VIVA'; switchTab('LIBRARY');">
+            <div class="cat-icon">🎙️</div>
+            <div class="cat-label">Viva Prep</div>
+          </div>
+        </div>
+
+        <div class="section-hdr">
+          <h2>Diploma Subjects (${filteredSubjects.length})</h2>
+          <button class="link-btn" onclick="switchTab('SUBJECTS')">View All →</button>
+        </div>
+        ${filteredSubjects.slice(0, 3).map(s => `
+          <div class="subj-card" onclick="state.selectedSubjectId='${s.id}'; switchTab('LIBRARY');">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span class="type-badge">${s.code} • Sem ${s.semester}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--primary);">${s.unitCount} Units →</span>
+            </div>
+            <h3 style="font-size:15px;font-weight:800;margin-top:6px;">${s.name}</h3>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:2px;">${s.description}</p>
+          </div>
+        `).join("")}
+
+        <div class="section-hdr">
+          <h2>Verified Study Materials</h2>
+          <button class="link-btn" onclick="switchTab('LIBRARY')">Explore All (${state.resources.length}) →</button>
+        </div>
+        ${recent.map(renderResourceCard).join("")}
+      `;
+    }
+
+    function renderSubjects() {
+      const semChips = [0, 1, 2, 3, 4, 5, 6].map(sem => `
+        <button class="chip ${state.selectedSemester === sem ? 'active' : ''}"
+          onclick="state.selectedSemester=${sem}; render();">
+          ${sem === 0 ? "All Semesters" : "Sem " + sem}
+        </button>
+      `).join("");
+
+      const list = state.subjects.filter(s => state.selectedSemester === 0 || s.semester === state.selectedSemester);
+      return `
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">UBTER Civil Engineering Subjects</h2>
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px;">Select any subject or unit to open notes, lab files & PYQs</p>
+        <div class="chip-row">${semChips}</div>
+        ${list.map(s => {
+          const count = state.resources.filter(r => r.subjectId === s.id).length;
+          return `
+            <div class="subj-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="type-badge">${s.code} • Semester ${s.semester}</span>
+                <span class="status-badge">${count} Resources</span>
+              </div>
+              <h3 style="font-size:16px;font-weight:800;margin-top:8px;">${s.name}</h3>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:4px 0 10px;">${s.description}</p>
+              ${(s.units || []).map(u => `
+                <div class="unit-box" onclick="state.selectedSubjectId='${s.id}'; state.searchQuery='Unit ${u.unitNumber}'; switchTab('LIBRARY');">
+                  <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:800;">
+                    <span>Unit ${u.unitNumber}: ${u.title}</span>
+                    <span style="color:var(--primary);">Open Notes →</span>
+                  </div>
+                  <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">${u.summary}</div>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }).join("")}
+      `;
+    }
+
+    function renderLibrary() {
+      const types = ["ALL", "NOTES", "PRACTICALS", "PYQS", "VIVA"];
+      const typeChips = types.map(t => `
+        <button class="chip ${state.selectedType === t ? 'active' : ''}"
+          onclick="state.selectedType='${t}'; render();">
+          ${t === "ALL" ? "All Categories" : t}
+        </button>
+      `).join("");
+
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = state.resources.filter(r => {
+        const matchType = state.selectedType === "ALL" || r.type === state.selectedType;
+        const matchSem = state.selectedSemester === 0 || r.semester === state.selectedSemester;
+        const matchSub = state.selectedSubjectId === "ALL" || r.subjectId === state.selectedSubjectId;
+        const matchQ = !q ||
+          r.title.toLowerCase().includes(q) ||
+          r.subjectName.toLowerCase().includes(q) ||
+          ("unit " + r.unit).includes(q) ||
+          (r.topicsCovered || []).some(top => top.toLowerCase().includes(q));
+        return matchType && matchSem && matchSub && matchQ;
+      });
+
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h2 style="font-size:20px;font-weight:800;">Resource Library (${filtered.length})</h2>
+          <button class="link-btn" onclick="state.searchQuery='';state.selectedType='ALL';state.selectedSemester=0;state.selectedSubjectId='ALL';render();">Reset Filters</button>
+        </div>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="lib-search-input" placeholder="Search by title, subject, unit or topic..."
+            value="${state.searchQuery}"
+            oninput="state.searchQuery=this.value; renderLibraryListOnly();" />
+        </div>
+        <div class="chip-row">${typeChips}</div>
+        <div id="library-results-list">
+          ${filtered.length ? filtered.map(renderResourceCard).join("") : `
+            <div class="res-card" style="text-align:center;padding:32px 16px;">
+              <div style="font-size:32px;margin-bottom:8px;">📂</div>
+              <h3 style="font-size:16px;font-weight:800;">No Matching Study Resources</h3>
+              <p style="font-size:12.5px;color:var(--text-muted);margin:6px 0 14px;">Try clearing your search filter or contribute a new note link.</p>
+              <button class="btn-sm primary" onclick="openSubmitModal()">+ Submit Study Resource</button>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderLibraryListOnly() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = state.resources.filter(r => {
+        const matchType = state.selectedType === "ALL" || r.type === state.selectedType;
+        const matchSem = state.selectedSemester === 0 || r.semester === state.selectedSemester;
+        const matchSub = state.selectedSubjectId === "ALL" || r.subjectId === state.selectedSubjectId;
+        const matchQ = !q ||
+          r.title.toLowerCase().includes(q) ||
+          r.subjectName.toLowerCase().includes(q) ||
+          ("unit " + r.unit).includes(q) ||
+          (r.topicsCovered || []).some(top => top.toLowerCase().includes(q));
+        return matchType && matchSem && matchSub && matchQ;
+      });
+      const container = document.getElementById("library-results-list");
+      if (container) {
+        container.innerHTML = filtered.length ? filtered.map(renderResourceCard).join("") : `<div class="res-card" style="text-align:center;padding:28px;">No matching resources found.</div>`;
+      }
+    }
+
+    function renderSaved() {
+      const saved = state.resources.filter(r => state.bookmarkedIds.includes(r.id));
+      return `
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">Saved Notes (${saved.length})</h2>
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;">Synced across Android & Web with Firebase Cloud Firestore</p>
+        ${saved.length ? saved.map(renderResourceCard).join("") : `
+          <div class="res-card" style="text-align:center;padding:32px 16px;">
+            <div style="font-size:32px;margin-bottom:8px;">🔖</div>
+            <h3 style="font-size:16px;font-weight:800;">No Bookmarked Notes Yet</h3>
+            <p style="font-size:12.5px;color:var(--text-muted);margin:6px 0 14px;">Tap the bookmark icon on any note, PYQ, or practical manual to save it here.</p>
+            <button class="btn-sm primary" onclick="switchTab('LIBRARY')">Browse Resource Library</button>
+          </div>
+        `}
+      `;
+    }
+
+    function renderProfile() {
+      return `
+        <div class="res-card">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+            <div style="width:54px;height:54px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;">
+              ${(state.userProfile.name || "RS").substring(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <h3 style="font-size:17px;font-weight:800;">${state.userProfile.name}</h3>
+              <div style="font-size:12.5px;color:var(--text-muted);">${state.userProfile.college}</div>
+              <div style="font-size:11.5px;font-weight:700;color:var(--emerald);margin-top:2px;">
+                ☁️ Firebase Cloud Sync Active ${state.userEmail ? "• " + state.userEmail : ""}
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;background:var(--surface-alt);padding:12px;border-radius:12px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:16px;font-weight:800;color:var(--primary);">${state.resources.length}</div>
+              <div style="font-size:11px;color:var(--text-muted);">Resources</div>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:800;color:var(--primary);">${state.bookmarkedIds.length}</div>
+              <div style="font-size:11px;color:var(--text-muted);">Saved</div>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:800;color:var(--primary);">Sem ${state.userProfile.semester}</div>
+              <div style="font-size:11px;color:var(--text-muted);">${state.userProfile.board}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-sm primary" onclick="shareAppLink()">🔗 Share Web App Link</button>
+            <button class="btn-sm" onclick="openCurrentInExternalBrowser()">↗ Open in External Browser</button>
+            <button class="btn-sm" onclick="toggleDarkTheme()">${state.darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}</button>
+          </div>
+        </div>
+
+        <div class="res-card">
+          <h3 style="font-size:15px;font-weight:800;margin-bottom:6px;">Shareable PolyNotes Web URL</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Share this link so classmates can open PolyNotes in Chrome or any mobile browser:</p>
+          <div style="padding:10px;background:var(--surface-alt);border-radius:10px;font-size:11.5px;word-break:break-all;margin-bottom:10px;font-family:monospace;">
+            ${WEB_SHARE_URL}
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-sm primary" onclick="shareAppLink()">Share Link</button>
+            <button class="btn-sm" onclick="openExternalUrl('${WEB_SHARE_URL}', event)">Open in Browser</button>
+          </div>
+        </div>
+
+        <div class="res-card">
+          <h3 style="font-size:15px;font-weight:800;margin-bottom:6px;">About PolyNotes & Academic Disclaimer</h3>
+          <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px;">
+            PolyNotes is an independent study portal built for Indian Polytechnic Diploma students (initially focused on UBTER Civil Engineering). All study notes, practical files, PYQs, and viva guides link to verified public educational repositories or ubter.in.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-sm" onclick="if(window.PolyNotesBridge) window.PolyNotesBridge.switchToNativeUi();">📱 Switch to Native Android UI</button>
+            <button class="btn-sm" style="color:#EF4444;" onclick="if(window.PolyNotesBridge) window.PolyNotesBridge.signOutUser();">Sign Out</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function render() {
+      const root = document.getElementById("app-content");
+      if (!root) return;
+      if (state.currentTab === "HOME") root.innerHTML = renderHome();
+      else if (state.currentTab === "SUBJECTS") root.innerHTML = renderSubjects();
+      else if (state.currentTab === "LIBRARY") root.innerHTML = renderLibrary();
+      else if (state.currentTab === "SAVED") root.innerHTML = renderSaved();
+      else if (state.currentTab === "PROFILE") root.innerHTML = renderProfile();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      syncFromAndroidBridge();
+    });
+  </script>
+</body>
+</html>

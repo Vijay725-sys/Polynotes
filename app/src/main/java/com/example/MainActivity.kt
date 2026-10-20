@@ -190,6 +190,26 @@ fun PolyNotesApp(
                         }
                         TextButton(
                             onClick = {
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "PolyNotes — Public Polytechnic Study Portal")
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        "🌐 PolyNotes Public Study Portal (Every Subject. Every Note. One Place.)\nAccess free Polytechnic Diploma notes, practical manuals & PYQs: $EXTERNAL_WEB_URL"
+                                    )
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share PolyNotes Public Link"))
+                            },
+                            modifier = Modifier.testTag("share_public_link_fab")
+                        ) {
+                            Text(
+                                text = "Share",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        TextButton(
+                            onClick = {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(EXTERNAL_WEB_URL))
                                 context.startActivity(intent)
                             },

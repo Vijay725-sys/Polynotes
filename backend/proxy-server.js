@@ -1,12 +1,20 @@
 /**
- * PolyNotes Lightweight Backend Proxy & Serverless Function
- * ---------------------------------------------------------
+ * PolyNotes Lightweight Backend Proxy & Public Shareable Web Server
+ * -----------------------------------------------------------------
  * Keeps all external API keys (e.g., process.env.EXTERNAL_API_KEY) strictly on
- * the server side so that ZERO API keys are ever bundled into the Android APK.
+ * the server side so that ZERO API keys are ever bundled into the Android APK,
+ * and exposes public shareable endpoints for open access.
  */
 
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
 const { URL } = require("node:url");
+
+const PUBLIC_SHARED_APP_URL =
+  "https://ais-pre-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app";
+const DEV_SHARED_APP_URL =
+  "https://ais-dev-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app";
 
 const VALID_BOARDS = ["UBTER", "BTEUP", "HSBTE", "MSBTE"];
 const VALID_BRANCHES = ["CIVIL", "MECHANICAL", "ELECTRICAL", "CSE"];
@@ -99,6 +107,20 @@ async function handleProxyRequest(req, res) {
     process.env.EXTERNAL_API_KEY || process.env.BACKEND_UPSTREAM_SECRET
   );
 
+  // 0. Public Shareable Web Portal HTML route (GET / or GET /public)
+  if (req.method === "GET" && (pathname === "/" || pathname === "/public")) {
+    const htmlPath = path.resolve(__dirname, "../app/src/main/assets/polynotes_webapp.html");
+    if (fs.existsSync(htmlPath)) {
+      const html = fs.readFileSync(htmlPath, "utf8");
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=300"
+      });
+      return res.end(html);
+    }
+  }
+
   // 1. Health & Security Posture Endpoint
   if (req.method === "GET" && pathname === "/api/v1/health") {
     return sendJson(res, 200, {
@@ -106,9 +128,26 @@ async function handleProxyRequest(req, res) {
       service: "polynotes-backend-proxy",
       proxyArchitecture: "serverless-http-proxy",
       clientApiKeysRemoved: true,
+      publicAccessEnabled: true,
+      publicAppUrl: PUBLIC_SHARED_APP_URL,
       serverEnvConfigured: hasServerSecretConfigured,
       communityResourcesCount: proxyStore.communityResources.length,
       timestamp: new Date().toISOString()
+    });
+  }
+
+  // 1b. Public Share Metadata Endpoint
+  if (req.method === "GET" && pathname === "/api/v1/share") {
+    return sendJson(res, 200, {
+      status: "ok",
+      publicAccess: true,
+      allowAnonymousRead: true,
+      publicAppUrl: PUBLIC_SHARED_APP_URL,
+      devAppUrl: DEV_SHARED_APP_URL,
+      shareTitle: "PolyNotes — Public Polytechnic Study Portal",
+      shareMessage:
+        "Access free UBTER & Polytechnic Diploma study notes, practical manuals, PYQs & viva guides on PolyNotes: " +
+        PUBLIC_SHARED_APP_URL
     });
   }
 
@@ -116,6 +155,7 @@ async function handleProxyRequest(req, res) {
   if (req.method === "GET" && pathname === "/api/v1/resources") {
     return sendJson(res, 200, {
       status: "ok",
+      publicAccess: true,
       resources: proxyStore.communityResources
     });
   }
@@ -257,7 +297,7 @@ if (require.main === module) {
   const port = Number(process.env.PORT || 8787);
   const server = createProxyServer();
   server.listen(port, "0.0.0.0", () => {
-    console.log(`PolyNotes Lightweight Backend Proxy listening on http://0.0.0.0:${port}`);
+    console.log(`PolyNotes Public Shareable Backend Proxy listening on http://0.0.0.0:${port}`);
   });
 }
 
@@ -265,5 +305,6 @@ module.exports = {
   handleProxyRequest,
   createProxyServer,
   validateProfilePayload,
-  validateResourcePayload
+  validateResourcePayload,
+  PUBLIC_SHARED_APP_URL
 };

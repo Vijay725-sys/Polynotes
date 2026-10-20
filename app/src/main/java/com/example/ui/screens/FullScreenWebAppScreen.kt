@@ -1,10 +1,13 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -38,7 +41,9 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
@@ -46,12 +51,13 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -94,14 +100,11 @@ import com.example.ui.PolyNotesViewModel
 import org.json.JSONArray
 import org.json.JSONObject
 
-private const val SHARED_WEB_APP_URL =
+const val PUBLIC_SHARED_WEB_APP_URL =
     "https://ais-pre-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app"
 
 /**
- * State bridge and JSON serializer for the Full-Screen Web App experience.
- * Implemented without instantiating system Chromium WebView so the app avoids
- * Chromium C++ variations seed errors while delivering a fast, native full-screen
- * web app experience.
+ * State bridge, public link sharer, and JSON serializer for the Full-Screen Web App experience.
  */
 class PolyNotesWebBridge(
     private val context: Context,
@@ -120,6 +123,8 @@ class PolyNotesWebBridge(
 
         val root = JSONObject()
         root.put("isDarkMode", isDark)
+        root.put("publicShareUrl", PUBLIC_SHARED_WEB_APP_URL)
+        root.put("isPubliclyShareable", true)
 
         val profileObj = JSONObject().apply {
             put("name", profile.name)
@@ -192,13 +197,13 @@ class PolyNotesWebBridge(
         return root.toString()
     }
 
-    fun openExternalBrowser(url: String = SHARED_WEB_APP_URL) {
+    fun openExternalBrowser(url: String = PUBLIC_SHARED_WEB_APP_URL) {
         mainHandler.post {
             try {
                 val target = if (url.startsWith("http://") || url.startsWith("https://")) {
                     url
                 } else {
-                    SHARED_WEB_APP_URL
+                    PUBLIC_SHARED_WEB_APP_URL
                 }
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target)).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -209,16 +214,51 @@ class PolyNotesWebBridge(
         }
     }
 
-    fun shareWebLink(url: String = SHARED_WEB_APP_URL) {
+    fun copyPublicLinkToClipboard(url: String = PUBLIC_SHARED_WEB_APP_URL, label: String = "PolyNotes Public Link") {
+        mainHandler.post {
+            try {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText(label, url))
+                Toast.makeText(context, "Public share link copied to clipboard!", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun shareWebLink(url: String = PUBLIC_SHARED_WEB_APP_URL) {
         mainHandler.post {
             try {
                 val shareText =
-                    "PolyNotes Web App (Every Subject. Every Note. One Place.) — Open in browser: $url"
+                    "🌐 PolyNotes Public Study Portal (Every Subject. Every Note. One Place.)\n" +
+                        "Access free Polytechnic Diploma notes, lab manuals, PYQs & viva guides (No login required):\n$url"
                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    putExtra(Intent.EXTRA_SUBJECT, "PolyNotes — Public Polytechnic Study Portal")
                     putExtra(Intent.EXTRA_TEXT, shareText)
                     type = "text/plain"
                 }
-                val chooser = Intent.createChooser(sendIntent, "Share PolyNotes Web App").apply {
+                val chooser = Intent.createChooser(sendIntent, "Share PolyNotes Public Link").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(chooser)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun shareResourcePublicLink(resource: StudyResource) {
+        mainHandler.post {
+            try {
+                val deepLink = "$PUBLIC_SHARED_WEB_APP_URL/?resourceId=${resource.id}"
+                val shareText =
+                    "📘 ${resource.title} (${resource.subjectName} • Unit ${resource.unit})\n" +
+                        "Open in PolyNotes Public Portal: $deepLink\n" +
+                        "Direct Study Material Link: ${resource.documentUrl}"
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    putExtra(Intent.EXTRA_SUBJECT, "${resource.title} — PolyNotes")
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                    type = "text/plain"
+                }
+                val chooser = Intent.createChooser(sendIntent, "Share Study Resource").apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(chooser)
@@ -238,7 +278,7 @@ private enum class WebPortalTab(val label: String) {
     EXPLORE("Explore"),
     SUBJECTS("Subjects"),
     SAVED("Saved"),
-    SECURITY("Proxy & Status")
+    PUBLIC_SHARE("Public Share")
 }
 
 @Composable
@@ -266,6 +306,8 @@ fun FullScreenWebAppScreen(
     var selectedSubjectFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var expandedSubjectId by rememberSaveable { mutableStateOf<String?>(null) }
     var showContributeDialog by rememberSaveable { mutableStateOf(false) }
+    var showPublicShareDialog by rememberSaveable { mutableStateOf(false) }
+    var linkCopiedState by remember { mutableStateOf(false) }
 
     val filteredWebResources = remember(allResources, searchQuery, selectedTypeFilter, selectedSubjectFilter) {
         allResources.filter { res ->
@@ -314,7 +356,7 @@ fun FullScreenWebAppScreen(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { bridge.openExternalBrowser(SHARED_WEB_APP_URL) }
+                            .clickable { bridge.copyPublicLinkToClipboard(PUBLIC_SHARED_WEB_APP_URL) }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -328,7 +370,7 @@ fun FullScreenWebAppScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = SHARED_WEB_APP_URL,
+                                text = PUBLIC_SHARED_WEB_APP_URL,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -340,7 +382,21 @@ fun FullScreenWebAppScreen(
                     Spacer(modifier = Modifier.width(4.dp))
 
                     IconButton(
-                        onClick = { bridge.openExternalBrowser(SHARED_WEB_APP_URL) },
+                        onClick = { bridge.shareWebLink(PUBLIC_SHARED_WEB_APP_URL) },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("bar_share_public_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Share,
+                            contentDescription = "Share Public Link",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { bridge.openExternalBrowser(PUBLIC_SHARED_WEB_APP_URL) },
                         modifier = Modifier
                             .size(48.dp)
                             .testTag("open_external_browser_btn")
@@ -426,11 +482,26 @@ fun FullScreenWebAppScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text(
-                                    text = "PolyNotes Web",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "PolyNotes Web",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(50),
+                                        color = Color(0xFF10B981).copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = "PUBLIC",
+                                            color = Color(0xFF10B981),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                                 Text(
                                     text = "${userProfile.board.code} • ${userProfile.branch.code} Sem ${userProfile.semester}",
                                     style = MaterialTheme.typography.labelSmall,
@@ -441,6 +512,19 @@ fun FullScreenWebAppScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { showPublicShareDialog = true },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .testTag("header_public_share_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = "Share Public Link",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
                             IconButton(
                                 onClick = { viewModel.setDarkMode(!isDarkMode) },
                                 modifier = Modifier.size(48.dp)
@@ -477,7 +561,7 @@ fun FullScreenWebAppScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Hero Banner Card
+                    // Hero Banner Card with Public Share & Copy Controls
                     item {
                         Box(
                             modifier = Modifier
@@ -496,7 +580,7 @@ fun FullScreenWebAppScreen(
                                     color = Color.White.copy(alpha = 0.16f)
                                 ) {
                                     Text(
-                                        text = "🌐 FULL-SCREEN WEB APP • ZERO CLIENT API KEYS",
+                                        text = "🌍 PUBLIC SHAREABLE WEB APP • NO LOGIN REQUIRED",
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
@@ -512,30 +596,69 @@ fun FullScreenWebAppScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Curated UBTER & State Polytechnic study notes, lab manuals, PYQs, and viva banks synced via our serverless backend proxy.",
+                                    text = "Anyone with the public link can view, search, and download all UBTER & Polytechnic study notes, practical manuals, PYQs, and viva banks.",
                                     color = Color(0xFFE0E7FF),
                                     fontSize = 13.sp
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     Button(
-                                        onClick = { bridge.openExternalBrowser(SHARED_WEB_APP_URL) },
-                                        shape = RoundedCornerShape(50)
+                                        onClick = { showPublicShareDialog = true },
+                                        shape = RoundedCornerShape(50),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF10B981),
+                                            contentColor = Color.White
+                                        ),
+                                        modifier = Modifier.testTag("hero_share_public_link_btn")
                                     ) {
                                         Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                            imageVector = Icons.Filled.Share,
                                             contentDescription = null,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Open in External Browser", fontSize = 12.sp)
+                                        Text("Share Public Link", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
+
                                     OutlinedButton(
-                                        onClick = onSwitchToNativeUi,
+                                        onClick = {
+                                            bridge.copyPublicLinkToClipboard(PUBLIC_SHARED_WEB_APP_URL)
+                                            linkCopiedState = true
+                                        },
+                                        shape = RoundedCornerShape(50),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
+                                        modifier = Modifier.testTag("hero_copy_public_link_btn")
+                                    ) {
+                                        Icon(
+                                            imageVector = if (linkCopiedState) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (linkCopiedState) "Link Copied!" else "Copy Link",
+                                            color = Color.White,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { bridge.openExternalBrowser(PUBLIC_SHARED_WEB_APP_URL) },
                                         shape = RoundedCornerShape(50),
                                         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
                                     ) {
-                                        Text("Native App View", color = Color.White, fontSize = 12.sp)
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Open Browser", color = Color.White, fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -602,6 +725,7 @@ fun FullScreenWebAppScreen(
                                         completedTopics.containsAll(resource.topicsCovered),
                                     onToggleBookmark = { viewModel.toggleBookmark(resource.id) },
                                     onToggleCompleted = { viewModel.toggleResourceCompletion(resource) },
+                                    onShareResource = { bridge.shareResourcePublicLink(resource) },
                                     onOpenDocument = { bridge.openExternalBrowser(resource.documentUrl) }
                                 )
                             }
@@ -683,14 +807,30 @@ fun FullScreenWebAppScreen(
                                                 }
                                             }
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Button(
-                                                onClick = {
-                                                    selectedSubjectFilter = subject.id
-                                                    activeTab = WebPortalTab.EXPLORE
-                                                },
-                                                shape = RoundedCornerShape(50)
-                                            ) {
-                                                Text("View Subject Notes & PYQs")
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Button(
+                                                    onClick = {
+                                                        selectedSubjectFilter = subject.id
+                                                        activeTab = WebPortalTab.EXPLORE
+                                                    },
+                                                    shape = RoundedCornerShape(50)
+                                                ) {
+                                                    Text("View Subject Notes & PYQs")
+                                                }
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        bridge.shareWebLink("$PUBLIC_SHARED_WEB_APP_URL/?subjectId=${subject.id}")
+                                                    },
+                                                    shape = RoundedCornerShape(50)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Share,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Share Subject")
+                                                }
                                             }
                                         }
                                     }
@@ -735,13 +875,22 @@ fun FullScreenWebAppScreen(
                                             completedTopics.containsAll(resource.topicsCovered),
                                         onToggleBookmark = { viewModel.toggleBookmark(resource.id) },
                                         onToggleCompleted = { viewModel.toggleResourceCompletion(resource) },
+                                        onShareResource = { bridge.shareResourcePublicLink(resource) },
                                         onOpenDocument = { bridge.openExternalBrowser(resource.documentUrl) }
                                     )
                                 }
                             }
                         }
 
-                        WebPortalTab.SECURITY -> {
+                        WebPortalTab.PUBLIC_SHARE -> {
+                            item {
+                                PublicShareAccessCard(
+                                    publicUrl = PUBLIC_SHARED_WEB_APP_URL,
+                                    onCopyLink = { bridge.copyPublicLinkToClipboard(PUBLIC_SHARED_WEB_APP_URL) },
+                                    onShareLink = { bridge.shareWebLink(PUBLIC_SHARED_WEB_APP_URL) },
+                                    onOpenBrowser = { bridge.openExternalBrowser(PUBLIC_SHARED_WEB_APP_URL) }
+                                )
+                            }
                             item {
                                 val report = remember(allResources.size) {
                                     AppSecurityAndHealthManager.runHealthCheck(
@@ -758,13 +907,13 @@ fun FullScreenWebAppScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Text(
-                                            text = "🛡️ Zero Client-Side API Keys • Backend Proxy",
+                                            text = "🛡️ Zero Client-Side API Keys • Public Backend Proxy",
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "All external API requests are handled by the serverless backend proxy (/api/v1) using server-side environment variables.",
+                                            text = "Safe for public sharing: Zero API keys are embedded inside the APK, and all external requests go through the serverless backend proxy (/api/v1).",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -821,7 +970,7 @@ fun FullScreenWebAppScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { bridge.openExternalBrowser(SHARED_WEB_APP_URL) },
+                            onClick = { bridge.openExternalBrowser(PUBLIC_SHARED_WEB_APP_URL) },
                             modifier = Modifier
                                 .size(48.dp)
                                 .testTag("floating_external_browser_btn")
@@ -835,14 +984,14 @@ fun FullScreenWebAppScreen(
                         }
 
                         IconButton(
-                            onClick = { bridge.shareWebLink(SHARED_WEB_APP_URL) },
+                            onClick = { showPublicShareDialog = true },
                             modifier = Modifier
                                 .size(48.dp)
                                 .testTag("floating_share_web_btn")
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Share,
-                                contentDescription = "Share Web Link",
+                                contentDescription = "Share Public Web Link",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -901,12 +1050,22 @@ fun FullScreenWebAppScreen(
                 label = { Text("Saved (${bookmarkedIds.size})") }
             )
             NavigationBarItem(
-                selected = activeTab == WebPortalTab.SECURITY,
-                onClick = { activeTab = WebPortalTab.SECURITY },
-                icon = { Icon(Icons.Filled.Security, contentDescription = "Proxy") },
-                label = { Text("Proxy") }
+                selected = activeTab == WebPortalTab.PUBLIC_SHARE,
+                onClick = { activeTab = WebPortalTab.PUBLIC_SHARE },
+                icon = { Icon(Icons.Filled.Public, contentDescription = "Public Share") },
+                label = { Text("Public Share") }
             )
         }
+    }
+
+    if (showPublicShareDialog) {
+        PublicShareDialog(
+            publicUrl = PUBLIC_SHARED_WEB_APP_URL,
+            onDismiss = { showPublicShareDialog = false },
+            onCopyLink = { bridge.copyPublicLinkToClipboard(PUBLIC_SHARED_WEB_APP_URL) },
+            onShareSystem = { bridge.shareWebLink(PUBLIC_SHARED_WEB_APP_URL) },
+            onOpenBrowser = { bridge.openExternalBrowser(PUBLIC_SHARED_WEB_APP_URL) }
+        )
     }
 
     if (showContributeDialog) {
@@ -932,12 +1091,267 @@ fun FullScreenWebAppScreen(
 }
 
 @Composable
+fun PublicShareAccessCard(
+    publicUrl: String,
+    onCopyLink: () -> Unit,
+    onShareLink: () -> Unit,
+    onOpenBrowser: () -> Unit
+) {
+    var copied by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("public_share_access_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF10B981).copy(alpha = 0.15f),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.Public,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Public Shareable Access Enabled",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "Anyone with this link can open & use PolyNotes without sign-in",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onCopyLink()
+                        copied = true
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = publicUrl,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                        contentDescription = "Copy Public URL",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onShareLink,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("card_share_public_btn"),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Share Link", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        onCopyLink()
+                        copied = true
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("card_copy_public_btn"),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Icon(
+                        imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (copied) "Copied!" else "Copy URL", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            TextButton(
+                onClick = onOpenBrowser,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Open Public Portal in External Browser", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun PublicShareDialog(
+    publicUrl: String,
+    onDismiss: () -> Unit,
+    onCopyLink: () -> Unit,
+    onShareSystem: () -> Unit,
+    onOpenBrowser: () -> Unit
+) {
+    var copied by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Public,
+                    contentDescription = null,
+                    tint = Color(0xFF10B981)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Share Public App Link", fontWeight = FontWeight.ExtraBold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "PolyNotes is publicly accessible! Anyone with this link can browse all subjects, units, study notes, practical manuals, and PYQs in their browser or app.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onCopyLink()
+                            copied = true
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = publicUrl,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                            contentDescription = "Copy Link",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            onCopyLink()
+                            copied = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (copied) "Copied!" else "Copy Link", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            onOpenBrowser()
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Open Browser", fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onShareSystem()
+                    onDismiss()
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Share,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Share via Apps")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
 private fun WebResourceCard(
     resource: StudyResource,
     isBookmarked: Boolean,
     isCompleted: Boolean,
     onToggleBookmark: () -> Unit,
     onToggleCompleted: () -> Unit,
+    onShareResource: () -> Unit,
     onOpenDocument: () -> Unit
 ) {
     Card(
@@ -1003,7 +1417,7 @@ private fun WebResourceCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     IconButton(onClick = onToggleBookmark) {
                         Icon(
                             imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
@@ -1016,6 +1430,13 @@ private fun WebResourceCard(
                             imageVector = if (isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
                             contentDescription = "Mark Revised",
                             tint = if (isCompleted) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onShareResource) {
+                        Icon(
+                            imageVector = Icons.Filled.Share,
+                            contentDescription = "Share Public Link to Resource",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -1110,7 +1531,7 @@ private fun WebContributeResourceDialog(
                     }
                 }
             ) {
-                Text("Submit via Proxy")
+                Text("Submit Publicly")
             }
         },
         dismissButton = {

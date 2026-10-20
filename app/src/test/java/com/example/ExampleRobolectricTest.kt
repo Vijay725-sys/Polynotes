@@ -32,9 +32,14 @@ class ExampleRobolectricTest {
     @Test
     fun `verify zero client side API keys in Android APK BuildConfig`() {
         assertTrue(
-            "Android APK BuildConfig must not contain any embedded API_KEY, SECRET, or TOKEN fields",
+            "Android APK BuildConfig must not contain any embedded GEMINI, API_KEY, SECRET, or TOKEN fields",
             AppSecurityAndHealthManager.hasZeroClientSideApiKeysInApk()
         )
+        val redacted = AppSecurityAndHealthManager.redactPotentialSecrets(
+            "Error with key AIzaSyTestFakeKeyPattern1234567890ABCD"
+        )
+        assertFalse(redacted.contains("AIzaSyTestFakeKeyPattern1234567890ABCD"))
+        assertTrue(redacted.contains("[REDACTED_API_KEY]"))
     }
 
     @Test

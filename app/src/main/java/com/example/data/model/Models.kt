@@ -1,10 +1,5 @@
 package com.example.data.model
 
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.DocumentId
-import com.google.firebase.firestore.IgnoreExtraProperties
-import com.google.firebase.firestore.ServerTimestamp
-
 enum class TechnicalBoard(val code: String, val displayName: String, val state: String) {
     UBTER("UBTER", "UBTER (Roorkee)", "Uttarakhand"),
     BTEUP("BTEUP", "BTEUP (Lucknow)", "Uttar Pradesh"),
@@ -85,17 +80,16 @@ data class SystemHealthCheckItem(
 
 data class SystemHealthReport(
     val allHealthy: Boolean = true,
-    val databaseId: String = "",
+    val proxyEndpointUrl: String = "",
     val checks: List<SystemHealthCheckItem> = emptyList()
 )
 
 /**
- * Firestore document model for `/users/{userId}`
+ * Shared DTO for syncing student profile & progress with the Backend Proxy (`/api/v1/profile`).
  */
-@IgnoreExtraProperties
 data class UserProfileDoc(
-    @DocumentId val id: String = "",
-    val userId: String = "",
+    val id: String = "",
+    val userId: String = "default_student",
     val name: String = "Rahul Sharma",
     val college: String = "Govt. Polytechnic Dehradun",
     val board: String = "UBTER",
@@ -107,9 +101,7 @@ data class UserProfileDoc(
         "Pull, Temperature & Sag Corrections",
         "IS 10262 Step-by-Step Flowchart"
     ),
-    val darkMode: Boolean = false,
-    @ServerTimestamp val createdAt: Timestamp? = null,
-    @ServerTimestamp val updatedAt: Timestamp? = null
+    val darkMode: Boolean = false
 ) {
     fun toUserProfile(): UserProfile {
         val parsedBoard = try {
@@ -133,12 +125,11 @@ data class UserProfileDoc(
 }
 
 /**
- * Firestore document model for `/users/{userId}/resources/{resourceId}`
+ * Shared DTO for syncing community study resources with the Backend Proxy (`/api/v1/resources`).
  */
-@IgnoreExtraProperties
 data class CloudStudyResource(
-    @DocumentId val id: String = "",
-    val userId: String = "",
+    val id: String = "",
+    val userId: String = "default_student",
     val subjectId: String = "ubter_ce_301",
     val subjectName: String = "Basic Surveying",
     val title: String = "",
@@ -152,9 +143,7 @@ data class CloudStudyResource(
     val description: String = "",
     val topicsCovered: List<String> = emptyList(),
     val pageCountOrLength: String = "Community Submission",
-    val fileFormat: String = "PDF / Web Link",
-    @ServerTimestamp val createdAt: Timestamp? = null,
-    @ServerTimestamp val updatedAt: Timestamp? = null
+    val fileFormat: String = "PDF / Web Link"
 ) {
     fun toStudyResource(): StudyResource {
         val parsedType = try {
@@ -168,7 +157,7 @@ data class CloudStudyResource(
             ReviewStatus.UNDER_REVIEW
         }
         return StudyResource(
-            id = id.ifBlank { "cloud_res" },
+            id = id.ifBlank { "proxy_res" },
             subjectId = subjectId,
             subjectName = subjectName,
             title = title,

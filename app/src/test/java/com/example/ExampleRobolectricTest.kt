@@ -6,6 +6,7 @@ import com.example.data.model.CloudStudyResource
 import com.example.data.model.ResourceType
 import com.example.data.model.UserProfileDoc
 import com.example.data.remote.AppSecurityAndHealthManager
+import com.example.data.remote.PolyNotesBackendProxyClient
 import com.example.data.repository.PolyNotesRepository
 import com.example.data.sample.SampleData
 import org.junit.Assert.assertEquals
@@ -26,6 +27,14 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
         assertEquals("PolyNotes", appName)
+    }
+
+    @Test
+    fun `verify zero client side API keys in Android APK BuildConfig`() {
+        assertTrue(
+            "Android APK BuildConfig must not contain any embedded API_KEY, SECRET, or TOKEN fields",
+            AppSecurityAndHealthManager.hasZeroClientSideApiKeysInApk()
+        )
     }
 
     @Test
@@ -77,28 +86,31 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify schema contract validation and health check report`() {
+    fun `verify backend proxy client configuration and schema contract validation`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val validProfile = UserProfileDoc(userId = "uid_123", name = "Rahul Sharma", semester = 3L)
-        val invalidProfile = UserProfileDoc(userId = "uid_999", name = "Rahul Sharma", semester = 99L)
-        assertTrue(AppSecurityAndHealthManager.validateProfileContract(validProfile, "uid_123"))
-        assertFalse(AppSecurityAndHealthManager.validateProfileContract(invalidProfile, "uid_123"))
+        val proxyClient = PolyNotesBackendProxyClient()
+        assertTrue(proxyClient.baseUrl.endsWith("/api/v1"))
+
+        val validProfile = UserProfileDoc(userId = "stu_123", name = "Rahul Sharma", semester = 3L)
+        val invalidProfile = UserProfileDoc(userId = "stu_999", name = "Rahul Sharma", semester = 99L)
+        assertTrue(AppSecurityAndHealthManager.validateProfileContract(validProfile, "stu_123"))
+        assertFalse(AppSecurityAndHealthManager.validateProfileContract(invalidProfile, "stu_123"))
 
         val validRes = CloudStudyResource(
-            userId = "uid_123",
+            userId = "stu_123",
             title = "Valid Surveying Notes",
             documentUrl = "https://www.ubter.in"
         )
         val invalidRes = CloudStudyResource(
-            userId = "uid_123",
+            userId = "stu_123",
             title = "Bad URL",
             documentUrl = "javascript:alert(1)"
         )
-        assertTrue(AppSecurityAndHealthManager.validateResourceContract(validRes, "uid_123"))
-        assertFalse(AppSecurityAndHealthManager.validateResourceContract(invalidRes, "uid_123"))
+        assertTrue(AppSecurityAndHealthManager.validateResourceContract(validRes, "stu_123"))
+        assertFalse(AppSecurityAndHealthManager.validateResourceContract(invalidRes, "stu_123"))
 
-        val report = AppSecurityAndHealthManager.runHealthCheck(context, 16, "student@test.com")
-        assertTrue(report.checks.isNotEmpty())
-        assertTrue(report.databaseId.isNotBlank())
+        val report = AppSecurityAndHealthManager.runHealthCheck(context, 16)
+        assertTrue(report.allHealthy)
+        assertTrue(report.proxyEndpointUrl.contains("/api/v1"))
     }
 }

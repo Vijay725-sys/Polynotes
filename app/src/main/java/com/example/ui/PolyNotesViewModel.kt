@@ -1,6 +1,5 @@
 package com.example.ui
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.EngineeringBranch
@@ -17,10 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -49,7 +45,7 @@ data class UiState(
 
 class PolyNotesViewModel(
     private val repository: PolyNotesRepository,
-    private val currentUserId: String
+    private val currentStudentId: String = "default_student"
 ) : ViewModel() {
 
     val subjects: StateFlow<List<Subject>> = repository.subjects
@@ -72,31 +68,8 @@ class PolyNotesViewModel(
     val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
 
     init {
-        if (currentUserId.isNotBlank()) {
-            viewModelScope.launch {
-                repository.ensureUserProfileExists(currentUserId)
-            }
-
-            repository.observeUserProfileDoc(currentUserId)
-                .onEach { doc ->
-                    if (doc != null) {
-                        val profile = doc.toUserProfile()
-                        _uiState.value = _uiState.value.copy(
-                            selectedBoard = profile.board,
-                            selectedBranch = profile.branch
-                        )
-                    }
-                }
-                .catch { error ->
-                    Log.w(TAG, "Error observing user profile", error)
-                }
-                .launchIn(viewModelScope)
-
-            repository.observeCloudResources(currentUserId)
-                .catch { error ->
-                    Log.w(TAG, "Error observing cloud resources", error)
-                }
-                .launchIn(viewModelScope)
+        viewModelScope.launch {
+            repository.refreshFromBackendProxy()
         }
     }
 
@@ -197,11 +170,9 @@ class PolyNotesViewModel(
     fun toggleBookmark(resourceId: String) {
         val isNowBookmarked = repository.toggleBookmark(resourceId)
         viewModelScope.launch {
-            if (currentUserId.isNotBlank()) {
-                repository.saveUserProfileToCloud(currentUserId)
-            }
+            repository.syncProfileWithBackendProxy(currentStudentId)
             if (isNowBookmarked) {
-                _userMessage.emit("Saved to your cloud-synced bookmarks")
+                _userMessage.emit("Saved to your bookmarks")
             } else {
                 _userMessage.emit("Removed from Saved Notes")
             }
@@ -215,11 +186,9 @@ class PolyNotesViewModel(
     fun toggleTopicCompleted(topicKey: String) {
         val completed = repository.toggleTopicCompleted(topicKey)
         viewModelScope.launch {
-            if (currentUserId.isNotBlank()) {
-                repository.saveUserProfileToCloud(currentUserId)
-            }
+            repository.syncProfileWithBackendProxy(currentStudentId)
             if (completed) {
-                _userMessage.emit("Topic marked as revised & synced!")
+                _userMessage.emit("Topic marked as revised!")
             }
         }
     }
@@ -227,9 +196,7 @@ class PolyNotesViewModel(
     fun toggleResourceCompletion(resource: StudyResource) {
         val nowCompleted = repository.toggleResourceCompletion(resource)
         viewModelScope.launch {
-            if (currentUserId.isNotBlank()) {
-                repository.saveUserProfileToCloud(currentUserId)
-            }
+            repository.syncProfileWithBackendProxy(currentStudentId)
             if (nowCompleted) {
                 _userMessage.emit("Great job! '${resource.title}' marked 100% reviewed.")
             } else {
@@ -241,15 +208,14 @@ class PolyNotesViewModel(
     fun setDarkMode(enabled: Boolean) {
         repository.setDarkMode(enabled)
         viewModelScope.launch {
-            if (currentUserId.isNotBlank()) {
-                repository.saveUserProfileToCloud(currentUserId)
-            }
+            repository.syncProfileWithBackendProxy(currentStudentId)
         }
     }
 
     fun reportResourceIssue(resourceTitle: String, reason: String) {
         viewModelScope.launch {
-            _userMessage.emit("Report received for '$resourceTitle' ($reason). Our editorial team will review it within 24h.")
+            repository.reportResourceIssueViaProxy(resourceTitle, reason)
+            _userMessage.emit("Report sent via backend proxy for '$resourceTitle' ($reason).")
         }
     }
 
@@ -287,20 +253,8 @@ class PolyNotesViewModel(
 
         closeSubmitDialog()
         viewModelScope.launch {
-            if (currentUserId.isNotBlank()) {
-                repository.createCloudResource(
-                    title = title,
-                    subjectId = subjectId,
-                    subjectName = subjectName,
-                    unit = unit,
-                    type = type,
-                    documentUrl = documentUrl,
-                    source = source,
-                    semester = semester,
-                    description = description
-                )
-            }
-            _userMessage.emit("Resource '${newRes.title}' added & synced to cloud!")
+            repository.submitResourceViaBackendProxy(newRes, currentStudentId)
+            _userMessage.emit("Resource '${newRes.title}' added & forwarded to backend proxy!")
         }
         return true
     }
@@ -320,10 +274,8 @@ class PolyNotesViewModel(
             isProfileEditOpen = false
         )
         viewModelScope.launch {
-            if (currentUserId.isNotBlank()) {
-                repository.saveUserProfileToCloud(currentUserId)
-            }
-            _userMessage.emit("Academic profile updated & synced")
+            repository.syncProfileWithBackendProxy(currentStudentId)
+            _userMessage.emit("Academic profile updated & synced via backend proxy")
         }
     }
 
@@ -351,7 +303,6 @@ class PolyNotesViewModel(
     }
 
     private companion object {
-        const val TAG = "PolyNotesVM"
         const val STOP_TIMEOUT_MILLIS = 5000L
     }
 }

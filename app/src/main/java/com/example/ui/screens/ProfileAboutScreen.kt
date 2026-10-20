@@ -89,19 +89,17 @@ fun ProfileAboutScreen(
     userProfile: UserProfile,
     totalResourcesCount: Int,
     savedNotesCount: Int,
-    userEmail: String? = null,
     isDarkMode: Boolean = false,
     onDarkModeToggle: (Boolean) -> Unit = {},
     onEditProfileClick: () -> Unit,
     onSubmitNewResourceClick: () -> Unit,
-    onSignOutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
-    val healthReport = remember(totalResourcesCount, userEmail) {
-        AppSecurityAndHealthManager.runHealthCheck(context, totalResourcesCount, userEmail)
+    val healthReport = remember(totalResourcesCount) {
+        AppSecurityAndHealthManager.runHealthCheck(context, totalResourcesCount)
     }
 
     LazyColumn(
@@ -116,14 +114,14 @@ fun ProfileAboutScreen(
         item {
             Column {
                 Text(
-                    text = "Profile, Security & Cloud",
+                    text = "Profile, Proxy & About",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Manage your diploma branch, SHA-1 secured API key & cloud sync",
+                    text = "Zero client-side API keys • Serverless Backend Proxy (/api/v1)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -175,26 +173,6 @@ fun ProfileAboutScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (!userEmail.isNullOrBlank()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Filled.CloudDone,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = userEmail,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
                             }
                         }
 
@@ -265,25 +243,6 @@ fun ProfileAboutScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    OutlinedButton(
-                        onClick = onSignOutClick,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("sign_out_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Sign Out",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sign Out of Google Account", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -651,7 +610,7 @@ fun ProfileAboutScreen(
                     Text(
                         text = "• Independent Educational Platform: PolyNotes is an independent student & faculty learning resource and is NOT an official government app of UBTER Roorkee or AICTE.\n" +
                                "• Verified Public Sources: All documents link to open educational archives or the official board portal (ubter.in).\n" +
-                               "• Cloud & Local Privacy: Your saved notes and study progress are securely isolated per user in Firebase Cloud Firestore.",
+                               "• Zero Client-Side API Keys: All external API calls are routed through our lightweight backend proxy using server-side environment variables.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -789,7 +748,7 @@ fun ProfileAboutScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "1. Zero-Trust Cloud Storage: PolyNotes syncs your bookmarked notes, revision progress, and academic profile preferences to Firebase Cloud Firestore under strict per-student security rules.",
+                        text = "1. Backend Proxy Architecture: PolyNotes contains zero hardcoded or client-side API keys inside the Android APK. All external API requests are handled via our lightweight backend proxy (/api/v1) using server-side environment variables.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(

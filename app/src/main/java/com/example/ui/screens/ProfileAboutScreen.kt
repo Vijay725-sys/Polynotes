@@ -77,6 +77,9 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.EngineeringBranch
 import com.example.data.model.TechnicalBoard
 import com.example.data.model.UserProfile
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Security
+import com.example.data.remote.AppSecurityAndHealthManager
 
 private const val POLYNOTES_WEB_SHARE_URL =
     "https://ais-pre-xkizlrcvgd746t4pvwdm6a-599575110484.asia-east1.run.app"
@@ -86,15 +89,20 @@ fun ProfileAboutScreen(
     userProfile: UserProfile,
     totalResourcesCount: Int,
     savedNotesCount: Int,
+    userEmail: String? = null,
     isDarkMode: Boolean = false,
     onDarkModeToggle: (Boolean) -> Unit = {},
     onEditProfileClick: () -> Unit,
     onSubmitNewResourceClick: () -> Unit,
+    onSignOutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
+    val healthReport = remember(totalResourcesCount, userEmail) {
+        AppSecurityAndHealthManager.runHealthCheck(context, totalResourcesCount, userEmail)
+    }
 
     LazyColumn(
         modifier = modifier
@@ -108,14 +116,14 @@ fun ProfileAboutScreen(
         item {
             Column {
                 Text(
-                    text = "Profile & App Settings",
+                    text = "Profile, Security & Cloud",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Manage your diploma branch, local preferences & web sharing",
+                    text = "Manage your diploma branch, SHA-1 secured API key & cloud sync",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -167,6 +175,26 @@ fun ProfileAboutScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (!userEmail.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Filled.CloudDone,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = userEmail,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -238,6 +266,108 @@ fun ProfileAboutScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedButton(
+                        onClick = onSignOutClick,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("sign_out_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Sign Out",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sign Out of Google Account", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+
+        // System Health, API Key Security & Operational Posture Card
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("security_health_card")
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Security,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "API Key Security & System Health",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (healthReport.allHealthy) {
+                                    "All 5 production & security safeguards verified"
+                                } else {
+                                    "Check configuration diagnostics below"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    healthReport.checks.forEach { check ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 5.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = check.name,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = check.detail,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -257,7 +387,7 @@ fun ProfileAboutScreen(
                 StatCard(
                     title = "Bookmarks",
                     value = "$savedNotesCount",
-                    sub = "Saved Locally",
+                    sub = "Cloud Synced",
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(

@@ -1,0 +1,180 @@
+{
+  "entities": {
+    "UserProfileDoc": {
+      "title": "UserProfileDoc",
+      "description": "Stores an authenticated diploma student's academic profile, bookmarked resource IDs, and completed revision topics.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The authenticated Firebase user UID owning this profile."
+        },
+        "name": {
+          "type": "string",
+          "description": "Student full name (1 to 80 chars)."
+        },
+        "college": {
+          "type": "string",
+          "description": "Polytechnic institute name (1 to 120 chars)."
+        },
+        "board": {
+          "type": "string",
+          "enum": ["UBTER", "BTEUP", "HSBTE", "MSBTE"],
+          "description": "Technical education board code."
+        },
+        "branch": {
+          "type": "string",
+          "enum": ["CIVIL", "MECHANICAL", "ELECTRICAL", "CSE"],
+          "description": "Engineering diploma branch."
+        },
+        "semester": {
+          "type": "integer",
+          "description": "Current diploma semester (1 to 6)."
+        },
+        "bookmarkedIds": {
+          "type": "array",
+          "description": "List of bookmarked resource IDs (up to 200 items)."
+        },
+        "completedTopics": {
+          "type": "array",
+          "description": "List of completed syllabus topics (up to 200 items)."
+        },
+        "darkMode": {
+          "type": "boolean",
+          "description": "User preference for dark theme."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "college",
+        "board",
+        "branch",
+        "semester",
+        "bookmarkedIds",
+        "completedTopics",
+        "darkMode",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudStudyResource": {
+      "title": "CloudStudyResource",
+      "description": "A user-submitted study resource synced in the student's cloud library.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The authenticated Firebase user UID who submitted this resource."
+        },
+        "subjectId": {
+          "type": "string",
+          "description": "Associated subject ID."
+        },
+        "subjectName": {
+          "type": "string",
+          "description": "Associated subject display name."
+        },
+        "title": {
+          "type": "string",
+          "description": "Resource title (4 to 140 chars)."
+        },
+        "unit": {
+          "type": "integer",
+          "description": "Syllabus unit number (1 to 6)."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["NOTES", "PRACTICALS", "PYQS", "VIVA"],
+          "description": "Resource material category."
+        },
+        "documentUrl": {
+          "type": "string",
+          "description": "Valid HTTP/HTTPS link to the PDF or educational portal."
+        },
+        "source": {
+          "type": "string",
+          "description": "Document source or contributor attribution."
+        },
+        "reviewStatus": {
+          "type": "string",
+          "enum": ["FACULTY_VERIFIED", "PEER_REVIEWED", "UNDER_REVIEW"],
+          "description": "Verification status."
+        },
+        "uploadedAt": {
+          "type": "string",
+          "description": "Display month and year of upload."
+        },
+        "semester": {
+          "type": "integer",
+          "description": "Diploma semester (1 to 6)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Summary of syllabus topics covered."
+        },
+        "topicsCovered": {
+          "type": "array",
+          "description": "Bounded list of syllabus topics (up to 20 items)."
+        },
+        "pageCountOrLength": {
+          "type": "string",
+          "description": "Document length metadata."
+        },
+        "fileFormat": {
+          "type": "string",
+          "description": "Document format label."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "subjectId",
+        "subjectName",
+        "title",
+        "unit",
+        "type",
+        "documentUrl",
+        "source",
+        "reviewStatus",
+        "uploadedAt",
+        "semester",
+        "description",
+        "topicsCovered",
+        "pageCountOrLength",
+        "fileFormat",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfileDoc",
+      "description": "Per-user academic profile, bookmarked resource IDs, and completed topics."
+    },
+    "/users/{userId}/resources/{resourceId}": {
+      "schema": "CloudStudyResource",
+      "description": "Per-user custom submitted study resources."
+    }
+  }
+}

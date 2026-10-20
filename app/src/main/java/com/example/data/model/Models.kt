@@ -1,5 +1,10 @@
 package com.example.data.model
 
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.IgnoreExtraProperties
+import com.google.firebase.firestore.ServerTimestamp
+
 enum class TechnicalBoard(val code: String, val displayName: String, val state: String) {
     UBTER("UBTER", "UBTER (Roorkee)", "Uttarakhand"),
     BTEUP("BTEUP", "BTEUP (Lucknow)", "Uttar Pradesh"),
@@ -71,3 +76,113 @@ data class UserProfile(
     val branch: EngineeringBranch = EngineeringBranch.CIVIL,
     val semester: Int = 3
 )
+
+data class SystemHealthCheckItem(
+    val name: String = "",
+    val passed: Boolean = true,
+    val detail: String = ""
+)
+
+data class SystemHealthReport(
+    val allHealthy: Boolean = true,
+    val databaseId: String = "",
+    val checks: List<SystemHealthCheckItem> = emptyList()
+)
+
+/**
+ * Firestore document model for `/users/{userId}`
+ */
+@IgnoreExtraProperties
+data class UserProfileDoc(
+    @DocumentId val id: String = "",
+    val userId: String = "",
+    val name: String = "Rahul Sharma",
+    val college: String = "Govt. Polytechnic Dehradun",
+    val board: String = "UBTER",
+    val branch: String = "CIVIL",
+    val semester: Long = 3L,
+    val bookmarkedIds: List<String> = listOf("res_01", "res_07", "res_15"),
+    val completedTopics: List<String> = listOf(
+        "Surveying Fundamental Principles",
+        "Pull, Temperature & Sag Corrections",
+        "IS 10262 Step-by-Step Flowchart"
+    ),
+    val darkMode: Boolean = false,
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+) {
+    fun toUserProfile(): UserProfile {
+        val parsedBoard = try {
+            TechnicalBoard.valueOf(board)
+        } catch (_: Exception) {
+            TechnicalBoard.UBTER
+        }
+        val parsedBranch = try {
+            EngineeringBranch.valueOf(branch)
+        } catch (_: Exception) {
+            EngineeringBranch.CIVIL
+        }
+        return UserProfile(
+            name = name.ifBlank { "Rahul Sharma" },
+            college = college.ifBlank { "Govt. Polytechnic Dehradun" },
+            board = parsedBoard,
+            branch = parsedBranch,
+            semester = semester.toInt().coerceIn(1, 6)
+        )
+    }
+}
+
+/**
+ * Firestore document model for `/users/{userId}/resources/{resourceId}`
+ */
+@IgnoreExtraProperties
+data class CloudStudyResource(
+    @DocumentId val id: String = "",
+    val userId: String = "",
+    val subjectId: String = "ubter_ce_301",
+    val subjectName: String = "Basic Surveying",
+    val title: String = "",
+    val unit: Long = 1L,
+    val type: String = "NOTES",
+    val documentUrl: String = "https://www.ubter.in",
+    val source: String = "Student Contributor",
+    val reviewStatus: String = "UNDER_REVIEW",
+    val uploadedAt: String = "Oct 2026",
+    val semester: Long = 3L,
+    val description: String = "",
+    val topicsCovered: List<String> = emptyList(),
+    val pageCountOrLength: String = "Community Submission",
+    val fileFormat: String = "PDF / Web Link",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null
+) {
+    fun toStudyResource(): StudyResource {
+        val parsedType = try {
+            ResourceType.valueOf(type)
+        } catch (_: Exception) {
+            ResourceType.NOTES
+        }
+        val parsedStatus = try {
+            ReviewStatus.valueOf(reviewStatus)
+        } catch (_: Exception) {
+            ReviewStatus.UNDER_REVIEW
+        }
+        return StudyResource(
+            id = id.ifBlank { "cloud_res" },
+            subjectId = subjectId,
+            subjectName = subjectName,
+            title = title,
+            unit = unit.toInt().coerceIn(1, 6),
+            type = parsedType,
+            documentUrl = documentUrl,
+            source = source,
+            reviewStatus = parsedStatus,
+            uploadedAt = uploadedAt,
+            semester = semester.toInt().coerceIn(1, 6),
+            description = description,
+            topicsCovered = topicsCovered,
+            pageCountOrLength = pageCountOrLength,
+            fileFormat = fileFormat
+        )
+    }
+}

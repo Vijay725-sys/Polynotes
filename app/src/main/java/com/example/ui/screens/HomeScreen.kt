@@ -47,7 +47,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,9 +81,35 @@ import com.example.ui.theme.PYQsAccent
 import com.example.ui.theme.PYQsBadgeBg
 import com.example.ui.theme.PracticalsAccent
 import com.example.ui.theme.PracticalsBadgeBg
-import com.example.ui.theme.VerifiedGreen
 import com.example.ui.theme.VivaAccent
 import com.example.ui.theme.VivaBadgeBg
+
+enum class HomeQuickFilter(val label: String, val testTag: String) {
+    ALL_NOTES_AND_MANUALS("Notes & Manuals", "home_filter_notes_manuals"),
+    NOTES_ONLY("Notes", "home_filter_notes"),
+    PRACTICAL_MANUALS("Practical Manuals", "home_filter_practicals"),
+    ALL_MATERIALS("All Formats", "home_filter_all")
+}
+
+fun matchesHomeSearchQuery(
+    resource: StudyResource,
+    subjects: List<Subject>,
+    rawQuery: String
+): Boolean {
+    if (rawQuery.isBlank()) return true
+    val q = rawQuery.trim().lowercase()
+    val linkedSubject = subjects.find { it.id == resource.subjectId }
+    return resource.title.lowercase().contains(q) ||
+        resource.subjectName.lowercase().contains(q) ||
+        (linkedSubject?.code?.lowercase()?.contains(q) == true) ||
+        (linkedSubject?.description?.lowercase()?.contains(q) == true) ||
+        resource.description.lowercase().contains(q) ||
+        resource.topicsCovered.any { it.lowercase().contains(q) } ||
+        resource.type.displayName.lowercase().contains(q) ||
+        (q.contains("manual") && resource.type == ResourceType.PRACTICALS) ||
+        (q.contains("practical") && resource.type == ResourceType.PRACTICALS) ||
+        (q.contains("note") && resource.type == ResourceType.NOTES)
+}
 
 @Composable
 fun HomeScreen(
@@ -100,7 +131,35 @@ fun HomeScreen(
     onViewAllResourcesClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val semesterSubjects = subjects.filter { it.semester == selectedSemester }
+    var selectedQuickFilter by rememberSaveable { mutableStateOf(HomeQuickFilter.ALL_MATERIALS) }
+
+    val isSearching = searchQuery.isNotBlank()
+
+    // Filter resources by the Home quick filter and the top search bar query (title or subject keyword)
+    val filteredHomeResources = recentResources.filter { res ->
+        val matchesFormat = when (selectedQuickFilter) {
+            HomeQuickFilter.ALL_NOTES_AND_MANUALS ->
+                res.type == ResourceType.NOTES || res.type == ResourceType.PRACTICALS
+            HomeQuickFilter.NOTES_ONLY ->
+                res.type == ResourceType.NOTES
+            HomeQuickFilter.PRACTICAL_MANUALS ->
+                res.type == ResourceType.PRACTICALS
+            HomeQuickFilter.ALL_MATERIALS -> true
+        }
+        matchesFormat && matchesHomeSearchQuery(res, subjects, searchQuery)
+    }
+
+    val semesterSubjects = subjects.filter { subject ->
+        val matchesSem = if (isSearching) true else subject.semester == selectedSemester
+        val matchesQuery = if (!isSearching) true else {
+            val q = searchQuery.trim().lowercase()
+            subject.name.lowercase().contains(q) ||
+                subject.code.lowercase().contains(q) ||
+                subject.description.lowercase().contains(q)
+        }
+        matchesSem && matchesQuery
+    }
+
     val allTopicsCount = recentResources.sumOf { it.topicsCovered.size }.coerceAtLeast(1)
     val completedCount = completedTopics.size.coerceAtMost(allTopicsCount)
     val progressFraction = (completedCount.toFloat() / allTopicsCount.toFloat()).coerceIn(0.05f, 1f)
@@ -110,15 +169,222 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .testTag("home_screen"),
-        contentPadding = PaddingValues(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        contentPadding = PaddingValues(bottom = 88.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        // 1. Executive Gradient Hero Header with Blueprint Geometry
+        // 1. Top of Home Screen: Search Bar for Notes & Practical Manuals by Title or Subject Keyword
+        item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                    .testTag("home_top_search_container")
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("home_search_input"),
+                        placeholder = {
+                            Text(
+                                "Search notes & practical manuals by title or subject...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Search,
+                                contentDescription = "Search notes and practical manuals",
+                                tint = BrandPrimary
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { onSearchChange("") },
+                                    modifier = Modifier.testTag("home_search_clear_btn")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Clear,
+                                        contentDescription = "Clear search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items(HomeQuickFilter.entries) { filter ->
+                            val isSelected = selectedQuickFilter == filter
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedQuickFilter = filter },
+                                label = {
+                                    Text(
+                                        text = filter.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    borderColor = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outline
+                                    }
+                                ),
+                                modifier = Modifier.testTag(filter.testTag)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // If user is actively searching from the top search bar, display matching Notes & Practical Manuals immediately below the search bar
+        if (isSearching) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .testTag("home_search_results_section")
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Filtered Notes & Practical Manuals (${filteredHomeResources.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Matching \"$searchQuery\" by title or subject keyword",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        TextButton(
+                            onClick = { onSearchChange("") },
+                            modifier = Modifier.testTag("home_reset_search_btn")
+                        ) {
+                            Text(
+                                text = "Clear",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (filteredHomeResources.isEmpty()) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("home_search_empty_state")
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "No notes or practical manuals found",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "No study materials matched \"$searchQuery\". Try searching another title or subject like Surveying, Concrete, Hydraulics, or Soil.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = {
+                                        onSearchChange("")
+                                        selectedQuickFilter = HomeQuickFilter.ALL_MATERIALS
+                                    },
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Show All Notes & Manuals")
+                                }
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            filteredHomeResources.forEach { resource ->
+                                ResourceCard(
+                                    resource = resource,
+                                    isBookmarked = bookmarkedIds.contains(resource.id),
+                                    onBookmarkToggle = { onBookmarkToggle(resource.id) },
+                                    onClick = { onResourceClick(resource) },
+                                    completedTopics = completedTopics,
+                                    onToggleCompletion = { onToggleResourceCompletion(resource) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Executive Gradient Hero Header with Blueprint Geometry
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.linearGradient(
@@ -158,138 +424,90 @@ fun HomeScreen(
                     }
                     .padding(20.dp)
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.White.copy(alpha = 0.14f),
+                                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.25f))
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.White.copy(alpha = 0.14f),
-                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.25f))
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.School,
-                                            contentDescription = null,
-                                            tint = Color(0xFFFBBF24),
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = "${userProfile.board.code} • ${userProfile.branch.shortName.uppercase()}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFF10B981).copy(alpha = 0.2f)
-                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.School,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFBBF24),
+                                        modifier = Modifier.size(13.dp)
+                                    )
                                     Text(
-                                        text = "Sem $selectedSemester",
+                                        text = "${userProfile.board.code} • ${userProfile.branch.shortName.uppercase()}",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF6EE7B7),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        color = Color.White
                                     )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text(
-                                text = "PolyNotes",
-                                style = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Every Subject. Every Note. One Place.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFCBD5E1)
-                            )
-                        }
-
-                        // Student Avatar Badge
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
-                            modifier = Modifier.size(46.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFF10B981).copy(alpha = 0.2f)
+                            ) {
                                 Text(
-                                    text = userProfile.name.take(2).uppercase(),
-                                    style = MaterialTheme.typography.titleMedium,
+                                    text = "Sem $selectedSemester",
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = Color(0xFF6EE7B7),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Text(
+                            text = "PolyNotes",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Every Subject. Every Note. One Place.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFCBD5E1)
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Integrated High-Contrast Search Bar
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("home_search_input"),
-                        placeholder = {
+                    // Student Avatar Badge
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                        modifier = Modifier.size(46.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Text(
-                                "Search notes, IS codes, PYQs, or units...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF64748B)
+                                text = userProfile.name.take(2).uppercase(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Search,
-                                contentDescription = "Search",
-                                tint = BrandPrimary
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchChange("") }) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Clear,
-                                        contentDescription = "Clear",
-                                        tint = Color(0xFF64748B)
-                                    )
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF818CF8),
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedTextColor = Color(0xFF0F172A),
-                            unfocusedTextColor = Color(0xFF0F172A)
-                        )
-                    )
+                        }
+                    }
                 }
             }
         }
 
-        // 2. Semester Revision Progress & Quick Status Card
+        // 3. Semester Revision Progress & Quick Status Card
         item {
             Card(
                 shape = RoundedCornerShape(18.dp),
@@ -368,7 +586,7 @@ fun HomeScreen(
             }
         }
 
-        // 3. Semester Selector Horizontal Chips
+        // 4. Semester Selector Horizontal Chips
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Row(
@@ -383,7 +601,7 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "${userProfile.board.displayName}",
+                        text = userProfile.board.displayName,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -422,7 +640,7 @@ fun HomeScreen(
             }
         }
 
-        // 4. Quick Category Cards with Crisp Vector Icons
+        // 5. Quick Category Cards with Crisp Vector Icons
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
@@ -476,7 +694,7 @@ fun HomeScreen(
             }
         }
 
-        // 5. Subject Cards for Current Semester
+        // 6. Subject Cards for Current Semester
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Row(
@@ -485,7 +703,7 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Syllabus Subjects • Sem $selectedSemester",
+                        text = if (isSearching) "Matching Subjects" else "Syllabus Subjects • Sem $selectedSemester",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -518,24 +736,37 @@ fun HomeScreen(
                             horizontalAlignment = Alignment.Start
                         ) {
                             Text(
-                                text = "Core Civil Engineering Packs Available in Sem 3, 4 & 5",
+                                text = if (isSearching) {
+                                    "No subjects matched \"$searchQuery\""
+                                } else {
+                                    "Core Civil Engineering Packs Available in Sem 3, 4 & 5"
+                                },
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Switch to Semester 3, 4, or 5 to access full UBTER Civil Engineering subjects, or contribute notes for Semester $selectedSemester.",
+                                text = if (isSearching) {
+                                    "Clear the search filter above or browse Semester 3, 4, and 5 subjects."
+                                } else {
+                                    "Switch to Semester 3, 4, or 5 to access full UBTER Civil Engineering subjects, or contribute notes for Semester $selectedSemester."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                             Button(
-                                onClick = { onSemesterSelect(3) },
+                                onClick = {
+                                    if (isSearching) onSearchChange("") else onSemesterSelect(3)
+                                },
                                 shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                             ) {
-                                Text("Jump to Semester 3", style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text = if (isSearching) "Clear Search" else "Jump to Semester 3",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
                             }
                         }
                     }
@@ -553,75 +784,82 @@ fun HomeScreen(
             }
         }
 
-        // 6. Curated & Verified Resources Section
-        item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Verified Study Material",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Faculty-reviewed notes, lab manuals & solved board papers",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
+        // 7. Curated & Verified Resources Section (rendered when not already showing top search results)
+        if (!isSearching) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onViewAllResourcesClick() }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "See All",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = when (selectedQuickFilter) {
+                                    HomeQuickFilter.ALL_NOTES_AND_MANUALS -> "Notes & Practical Manuals"
+                                    HomeQuickFilter.NOTES_ONLY -> "Lecture Notes"
+                                    HomeQuickFilter.PRACTICAL_MANUALS -> "Practical Lab Manuals"
+                                    HomeQuickFilter.ALL_MATERIALS -> "Verified Study Material"
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Faculty-reviewed notes, lab manuals & solved board papers",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onViewAllResourcesClick() }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "See All",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val displayedResources = if (searchQuery.isNotBlank()) {
-                        recentResources
-                    } else {
-                        recentResources.take(6)
-                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val displayedResources = if (selectedQuickFilter == HomeQuickFilter.ALL_MATERIALS) {
+                            filteredHomeResources.take(6)
+                        } else {
+                            filteredHomeResources
+                        }
 
-                    displayedResources.forEach { resource ->
-                        ResourceCard(
-                            resource = resource,
-                            isBookmarked = bookmarkedIds.contains(resource.id),
-                            onBookmarkToggle = { onBookmarkToggle(resource.id) },
-                            onClick = { onResourceClick(resource) },
-                            completedTopics = completedTopics,
-                            onToggleCompletion = { onToggleResourceCompletion(resource) }
-                        )
+                        displayedResources.forEach { resource ->
+                            ResourceCard(
+                                resource = resource,
+                                isBookmarked = bookmarkedIds.contains(resource.id),
+                                onBookmarkToggle = { onBookmarkToggle(resource.id) },
+                                onClick = { onResourceClick(resource) },
+                                completedTopics = completedTopics,
+                                onToggleCompletion = { onToggleResourceCompletion(resource) }
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 7. Submit Resource Community Banner
+        // 8. Submit Resource Community Banner
         item {
             Card(
                 shape = RoundedCornerShape(20.dp),

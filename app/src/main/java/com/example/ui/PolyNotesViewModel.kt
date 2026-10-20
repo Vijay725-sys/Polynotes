@@ -1,7 +1,7 @@
 package com.example.ui
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.EngineeringBranch
 import com.example.data.model.ResourceType
@@ -17,7 +17,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -44,9 +47,10 @@ data class UiState(
     val isProfileEditOpen: Boolean = false
 )
 
-class PolyNotesViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = PolyNotesRepository(application.applicationContext)
+class PolyNotesViewModel(
+    private val repository: PolyNotesRepository,
+    private val currentUserId: String
+) : ViewModel() {
 
     val subjects: StateFlow<List<Subject>> = repository.subjects
     val allResources: StateFlow<List<StudyResource>> = repository.allResources
@@ -67,6 +71,35 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
     private val _userMessage = MutableSharedFlow<String>()
     val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
 
+    init {
+        if (currentUserId.isNotBlank()) {
+            viewModelScope.launch {
+                repository.ensureUserProfileExists(currentUserId)
+            }
+
+            repository.observeUserProfileDoc(currentUserId)
+                .onEach { doc ->
+                    if (doc != null) {
+                        val profile = doc.toUserProfile()
+                        _uiState.value = _uiState.value.copy(
+                            selectedBoard = profile.board,
+                            selectedBranch = profile.branch
+                        )
+                    }
+                }
+                .catch { error ->
+                    Log.w(TAG, "Error observing user profile", error)
+                }
+                .launchIn(viewModelScope)
+
+            repository.observeCloudResources(currentUserId)
+                .catch { error ->
+                    Log.w(TAG, "Error observing cloud resources", error)
+                }
+                .launchIn(viewModelScope)
+        }
+    }
+
     val filteredResources: StateFlow<List<StudyResource>> = combine(
         allResources,
         _uiState
@@ -75,11 +108,11 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
             val matchesQuery = if (state.searchQuery.isBlank()) true else {
                 val q = state.searchQuery.trim().lowercase()
                 res.title.lowercase().contains(q) ||
-                res.subjectName.lowercase().contains(q) ||
-                res.source.lowercase().contains(q) ||
-                "unit ${res.unit}".contains(q) ||
-                res.topicsCovered.any { it.lowercase().contains(q) } ||
-                res.type.displayName.lowercase().contains(q)
+                    res.subjectName.lowercase().contains(q) ||
+                    res.source.lowercase().contains(q) ||
+                    "unit ${res.unit}".contains(q) ||
+                    res.topicsCovered.any { it.lowercase().contains(q) } ||
+                    res.type.displayName.lowercase().contains(q)
             }
 
             val matchesType = state.selectedTypeFilter == null || res.type == state.selectedTypeFilter
@@ -88,14 +121,14 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
             matchesQuery && matchesType && matchesSemester && matchesSubject
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     val savedResources: StateFlow<List<StudyResource>> = combine(
         allResources,
         bookmarkedIds
     ) { resources, ids ->
         resources.filter { ids.contains(it.id) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     fun selectTab(tab: MainTab) {
         _uiState.value = _uiState.value.copy(
@@ -164,8 +197,11 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleBookmark(resourceId: String) {
         val isNowBookmarked = repository.toggleBookmark(resourceId)
         viewModelScope.launch {
+            if (currentUserId.isNotBlank()) {
+                repository.saveUserProfileToCloud(currentUserId)
+            }
             if (isNowBookmarked) {
-                _userMessage.emit("Saved to your study bookmarks")
+                _userMessage.emit("Saved to your cloud-synced bookmarks")
             } else {
                 _userMessage.emit("Removed from Saved Notes")
             }
@@ -179,8 +215,11 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleTopicCompleted(topicKey: String) {
         val completed = repository.toggleTopicCompleted(topicKey)
         viewModelScope.launch {
+            if (currentUserId.isNotBlank()) {
+                repository.saveUserProfileToCloud(currentUserId)
+            }
             if (completed) {
-                _userMessage.emit("Topic marked as revised!")
+                _userMessage.emit("Topic marked as revised & synced!")
             }
         }
     }
@@ -188,6 +227,9 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleResourceCompletion(resource: StudyResource) {
         val nowCompleted = repository.toggleResourceCompletion(resource)
         viewModelScope.launch {
+            if (currentUserId.isNotBlank()) {
+                repository.saveUserProfileToCloud(currentUserId)
+            }
             if (nowCompleted) {
                 _userMessage.emit("Great job! '${resource.title}' marked 100% reviewed.")
             } else {
@@ -198,6 +240,11 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setDarkMode(enabled: Boolean) {
         repository.setDarkMode(enabled)
+        viewModelScope.launch {
+            if (currentUserId.isNotBlank()) {
+                repository.saveUserProfileToCloud(currentUserId)
+            }
+        }
     }
 
     fun reportResourceIssue(resourceTitle: String, reason: String) {
@@ -240,7 +287,20 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
         closeSubmitDialog()
         viewModelScope.launch {
-            _userMessage.emit("Resource '${newRes.title}' added to library!")
+            if (currentUserId.isNotBlank()) {
+                repository.createCloudResource(
+                    title = title,
+                    subjectId = subjectId,
+                    subjectName = subjectName,
+                    unit = unit,
+                    type = type,
+                    documentUrl = documentUrl,
+                    source = source,
+                    semester = semester,
+                    description = description
+                )
+            }
+            _userMessage.emit("Resource '${newRes.title}' added & synced to cloud!")
         }
         return true
     }
@@ -260,7 +320,10 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
             isProfileEditOpen = false
         )
         viewModelScope.launch {
-            _userMessage.emit("Academic profile updated")
+            if (currentUserId.isNotBlank()) {
+                repository.saveUserProfileToCloud(currentUserId)
+            }
+            _userMessage.emit("Academic profile updated & synced")
         }
     }
 
@@ -285,5 +348,10 @@ class PolyNotesViewModel(application: Application) : AndroidViewModel(applicatio
             }
             else -> false
         }
+    }
+
+    private companion object {
+        const val TAG = "PolyNotesVM"
+        const val STOP_TIMEOUT_MILLIS = 5000L
     }
 }

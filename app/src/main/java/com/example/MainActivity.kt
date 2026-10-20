@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -47,11 +48,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,9 +64,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.data.repository.PolyNotesRepository
 import com.example.ui.MainTab
 import com.example.ui.PolyNotesViewModel
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.EditProfileBottomSheet
 import com.example.ui.screens.FullScreenWebAppScreen
 import com.example.ui.screens.HomeScreen
@@ -74,7 +83,12 @@ import com.example.ui.screens.SavedNotesScreen
 import com.example.ui.screens.SubjectDetailView
 import com.example.ui.screens.SubjectsScreen
 import com.example.ui.screens.SubmitResourceBottomSheet
+import com.example.ui.screens.signOut
 import com.example.ui.theme.PolyNotesTheme
+import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.collectLatest
 
 private const val EXTERNAL_WEB_URL =
@@ -93,21 +107,78 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppContent(viewModel: PolyNotesViewModel = viewModel()) {
+fun AppContent() {
+    var currentUser by remember { mutableStateOf(Firebase.auth.currentUser) }
     var isFullScreenWebMode by rememberSaveable { mutableStateOf(true) }
-    val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember(context) { CredentialManager.create(context) }
 
-    PolyNotesTheme(darkTheme = isDarkMode) {
-        if (isFullScreenWebMode) {
-            FullScreenWebAppScreen(
-                viewModel = viewModel,
-                onSwitchToNativeUi = { isFullScreenWebMode = false }
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        Firebase.auth.addAuthStateListener(listener)
+        onDispose {
+            Firebase.auth.removeAuthStateListener(listener)
+        }
+    }
+
+    val user = currentUser
+    if (user == null) {
+        PolyNotesTheme(darkTheme = false) {
+            AuthScreen(
+                onAuthSuccess = {
+                    currentUser = Firebase.auth.currentUser
+                }
             )
-        } else {
-            PolyNotesApp(
-                viewModel = viewModel,
-                onOpenFullScreenWebMode = { isFullScreenWebMode = true }
+        }
+    } else {
+        val viewModel: PolyNotesViewModel = viewModel(
+            key = user.uid,
+            factory = viewModelFactory {
+                initializer {
+                    val app = checkNotNull(this[APPLICATION_KEY]) {
+                        "APPLICATION_KEY missing from CreationExtras"
+                    }
+                    val databaseId = app.getString(R.string.firestore_database_id)
+                    val db = FirebaseFirestore.getInstance(databaseId)
+                    val prefs = app.getSharedPreferences("polynotes_prefs", Context.MODE_PRIVATE)
+                    PolyNotesViewModel(
+                        repository = PolyNotesRepository(db = db, prefs = prefs),
+                        currentUserId = user.uid
+                    )
+                }
+            }
+        )
+        val isDarkMode by viewModel.isDarkMode.collectAsState()
+        val handleSignOut: () -> Unit = {
+            signOut(
+                context = context,
+                credentialManager = credentialManager,
+                onSignOutComplete = {
+                    currentUser = null
+                },
+                scope = coroutineScope
             )
+        }
+
+        PolyNotesTheme(darkTheme = isDarkMode) {
+            if (isFullScreenWebMode) {
+                FullScreenWebAppScreen(
+                    viewModel = viewModel,
+                    userEmail = user.email,
+                    onSwitchToNativeUi = { isFullScreenWebMode = false },
+                    onSignOut = handleSignOut
+                )
+            } else {
+                PolyNotesApp(
+                    viewModel = viewModel,
+                    userEmail = user.email,
+                    onOpenFullScreenWebMode = { isFullScreenWebMode = true },
+                    onSignOut = handleSignOut
+                )
+            }
         }
     }
 }
@@ -115,7 +186,9 @@ fun AppContent(viewModel: PolyNotesViewModel = viewModel()) {
 @Composable
 fun PolyNotesApp(
     viewModel: PolyNotesViewModel,
-    onOpenFullScreenWebMode: () -> Unit = {}
+    userEmail: String? = null,
+    onOpenFullScreenWebMode: () -> Unit = {},
+    onSignOut: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -364,10 +437,12 @@ fun PolyNotesApp(
                                     userProfile = userProfile,
                                     totalResourcesCount = allResources.size,
                                     savedNotesCount = savedResources.size,
+                                    userEmail = userEmail,
                                     isDarkMode = isDarkMode,
                                     onDarkModeToggle = { enabled -> viewModel.setDarkMode(enabled) },
                                     onEditProfileClick = { viewModel.toggleProfileEdit(true) },
-                                    onSubmitNewResourceClick = { viewModel.openSubmitDialog() }
+                                    onSubmitNewResourceClick = { viewModel.openSubmitDialog() },
+                                    onSignOutClick = onSignOut
                                 )
                             }
                         }

@@ -1,0 +1,145 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Pillar 1: Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation Helper: UserProfileDoc
+    function isValidUserProfileDoc(data, userId) {
+      return data.keys().hasAll([
+               'userId', 'name', 'college', 'board', 'branch', 'semester',
+               'bookmarkedIds', 'completedTopics', 'darkMode', 'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'name', 'college', 'board', 'branch', 'semester',
+               'bookmarkedIds', 'completedTopics', 'darkMode', 'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId == userId && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.college is string && data.college.size() >= 1 && data.college.size() <= 120 &&
+             data.board is string && data.board in ['UBTER', 'BTEUP', 'HSBTE', 'MSBTE'] &&
+             data.branch is string && data.branch in ['CIVIL', 'MECHANICAL', 'ELECTRICAL', 'CSE'] &&
+             data.semester is int && data.semester >= 1 && data.semester <= 6 &&
+             data.bookmarkedIds is list && data.bookmarkedIds.size() <= 200 &&
+             (data.bookmarkedIds.size() == 0 || data.bookmarkedIds[0] is string) &&
+             data.completedTopics is list && data.completedTopics.size() <= 200 &&
+             (data.completedTopics.size() == 0 || data.completedTopics[0] is string) &&
+             data.darkMode is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Validation Helper: CloudStudyResource
+    function isValidCloudStudyResource(data, userId) {
+      return data.keys().hasAll([
+               'userId', 'subjectId', 'subjectName', 'title', 'unit', 'type',
+               'documentUrl', 'source', 'reviewStatus', 'uploadedAt', 'semester',
+               'description', 'topicsCovered', 'pageCountOrLength', 'fileFormat',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'subjectId', 'subjectName', 'title', 'unit', 'type',
+               'documentUrl', 'source', 'reviewStatus', 'uploadedAt', 'semester',
+               'description', 'topicsCovered', 'pageCountOrLength', 'fileFormat',
+               'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId == userId && data.userId.size() <= 128 &&
+             data.subjectId is string && data.subjectId.size() >= 1 && data.subjectId.size() <= 64 &&
+             data.subjectName is string && data.subjectName.size() >= 1 && data.subjectName.size() <= 100 &&
+             data.title is string && data.title.size() >= 4 && data.title.size() <= 140 &&
+             data.unit is int && data.unit >= 1 && data.unit <= 6 &&
+             data.type is string && data.type in ['NOTES', 'PRACTICALS', 'PYQS', 'VIVA'] &&
+             data.documentUrl is string && data.documentUrl.size() >= 8 && data.documentUrl.size() <= 500 &&
+             data.documentUrl.matches('^https?://.*') &&
+             data.source is string && data.source.size() >= 1 && data.source.size() <= 100 &&
+             data.reviewStatus is string && data.reviewStatus in ['FACULTY_VERIFIED', 'PEER_REVIEWED', 'UNDER_REVIEW'] &&
+             data.uploadedAt is string && data.uploadedAt.size() >= 1 && data.uploadedAt.size() <= 40 &&
+             data.semester is int && data.semester >= 1 && data.semester <= 6 &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 500 &&
+             data.topicsCovered is list && data.topicsCovered.size() <= 20 &&
+             (data.topicsCovered.size() == 0 || data.topicsCovered[0] is string) &&
+             data.pageCountOrLength is string && data.pageCountOrLength.size() >= 1 && data.pageCountOrLength.size() <= 60 &&
+             data.fileFormat is string && data.fileFormat.size() >= 1 && data.fileFormat.size() <= 40 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Collection 1: /users/{userId}
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfileDoc(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfileDoc(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action: Update Profile, Bookmarks, Completed Topics, or Theme
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'name', 'college', 'board', 'branch', 'semester',
+                           'bookmarkedIds', 'completedTopics', 'darkMode', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Subcollection 2: /users/{userId}/resources/{resourceId}
+      match /resources/{resourceId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(resourceId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(resourceId) &&
+                         isValidCloudStudyResource(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(resourceId) &&
+                         isValidCloudStudyResource(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'title', 'subjectId', 'subjectName', 'unit', 'type',
+                             'documentUrl', 'source', 'reviewStatus', 'semester',
+                             'description', 'topicsCovered', 'pageCountOrLength',
+                             'fileFormat', 'updatedAt'
+                           ])
+                         );
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(resourceId);
+      }
+    }
+  }
+}

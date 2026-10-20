@@ -2,7 +2,10 @@ package com.example
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.model.CloudStudyResource
 import com.example.data.model.ResourceType
+import com.example.data.model.UserProfileDoc
+import com.example.data.remote.AppSecurityAndHealthManager
 import com.example.data.repository.PolyNotesRepository
 import com.example.data.sample.SampleData
 import org.junit.Assert.assertEquals
@@ -28,7 +31,6 @@ class ExampleRobolectricTest {
     @Test
     fun `verify 16 sample resources loaded with valid data`() {
         assertEquals(16, SampleData.sampleResources.size)
-        // Verify all resources have valid document URLs
         SampleData.sampleResources.forEach { resource ->
             assertTrue(
                 "Resource ${resource.id} documentUrl should be valid: ${resource.documentUrl}",
@@ -44,13 +46,11 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repo1 = PolyNotesRepository(context)
 
-        // Toggle bookmark on resource 02
         val testResId = "res_02"
         val initialState = repo1.isBookmarked(testResId)
         val newState = repo1.toggleBookmark(testResId)
         assertEquals(!initialState, newState)
 
-        // Create new repository instance to simulate app restart
         val repo2 = PolyNotesRepository(context)
         assertEquals(newState, repo2.isBookmarked(testResId))
     }
@@ -74,5 +74,31 @@ class ExampleRobolectricTest {
 
         assertNotNull(newRes.id)
         assertTrue(repo.allResources.value.any { it.id == newRes.id })
+    }
+
+    @Test
+    fun `verify schema contract validation and health check report`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val validProfile = UserProfileDoc(userId = "uid_123", name = "Rahul Sharma", semester = 3L)
+        val invalidProfile = UserProfileDoc(userId = "uid_999", name = "Rahul Sharma", semester = 99L)
+        assertTrue(AppSecurityAndHealthManager.validateProfileContract(validProfile, "uid_123"))
+        assertFalse(AppSecurityAndHealthManager.validateProfileContract(invalidProfile, "uid_123"))
+
+        val validRes = CloudStudyResource(
+            userId = "uid_123",
+            title = "Valid Surveying Notes",
+            documentUrl = "https://www.ubter.in"
+        )
+        val invalidRes = CloudStudyResource(
+            userId = "uid_123",
+            title = "Bad URL",
+            documentUrl = "javascript:alert(1)"
+        )
+        assertTrue(AppSecurityAndHealthManager.validateResourceContract(validRes, "uid_123"))
+        assertFalse(AppSecurityAndHealthManager.validateResourceContract(invalidRes, "uid_123"))
+
+        val report = AppSecurityAndHealthManager.runHealthCheck(context, 16, "student@test.com")
+        assertTrue(report.checks.isNotEmpty())
+        assertTrue(report.databaseId.isNotBlank())
     }
 }

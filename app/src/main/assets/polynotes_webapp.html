@@ -544,7 +544,7 @@
       <div class="brand-logo">P</div>
       <div>
         <div class="brand-title">PolyNotes Web</div>
-        <div class="brand-subtitle">UBTER Civil Engineering • Cloud Synced</div>
+        <div class="brand-subtitle">UBTER Civil Engineering • Diploma Portal</div>
       </div>
     </div>
     <div class="topbar-actions">
@@ -604,7 +604,7 @@
         <input id="sub-desc" class="form-control" placeholder="Brief summary of syllabus topics covered" />
       </div>
       <div id="sub-error" style="color:#EF4444;font-size:12px;font-weight:700;margin-bottom:10px;display:none;"></div>
-      <button class="btn-sm primary" style="width:100%;justify-content:center;padding:12px;" onclick="handleResourceSubmit()">Submit & Sync to Cloud</button>
+      <button class="btn-sm primary" style="width:100%;justify-content:center;padding:12px;" onclick="handleResourceSubmit()">Submit Study Resource</button>
     </div>
   </div>
 
@@ -920,7 +920,7 @@
         window.PolyNotesBridge.submitResource(title, subjectId, subjectName, unit, type, url, source, sem, desc);
         closeSubmitModal();
         syncFromAndroidBridge();
-        showToast("Resource submitted & synced to Firebase Cloud!");
+        showToast("Resource added to PolyNotes library!");
       }
     }
 
@@ -1107,7 +1107,7 @@
       const saved = state.resources.filter(r => state.bookmarkedIds.includes(r.id));
       return `
         <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">Saved Notes (${saved.length})</h2>
-        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;">Synced across Android & Web with Firebase Cloud Firestore</p>
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;">Bookmarked study materials saved on your device</p>
         ${saved.length ? saved.map(renderResourceCard).join("") : `
           <div class="res-card" style="text-align:center;padding:32px 16px;">
             <div style="font-size:32px;margin-bottom:8px;">🔖</div>
@@ -1130,7 +1130,7 @@
               <h3 style="font-size:17px;font-weight:800;">${state.userProfile.name}</h3>
               <div style="font-size:12.5px;color:var(--text-muted);">${state.userProfile.college}</div>
               <div style="font-size:11.5px;font-weight:700;color:var(--emerald);margin-top:2px;">
-                ☁️ Firebase Cloud Sync Active ${state.userEmail ? "• " + state.userEmail : ""}
+                ✓ No API Key Required • Local Device Storage
               </div>
             </div>
           </div>
@@ -1174,7 +1174,6 @@
           </p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn-sm" onclick="if(window.PolyNotesBridge) window.PolyNotesBridge.switchToNativeUi();">📱 Switch to Native Android UI</button>
-            <button class="btn-sm" style="color:#EF4444;" onclick="if(window.PolyNotesBridge) window.PolyNotesBridge.signOutUser();">Sign Out</button>
           </div>
         </div>
       `;

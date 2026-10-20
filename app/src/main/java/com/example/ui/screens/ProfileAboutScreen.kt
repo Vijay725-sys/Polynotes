@@ -86,12 +86,10 @@ fun ProfileAboutScreen(
     userProfile: UserProfile,
     totalResourcesCount: Int,
     savedNotesCount: Int,
-    userEmail: String? = null,
     isDarkMode: Boolean = false,
     onDarkModeToggle: (Boolean) -> Unit = {},
     onEditProfileClick: () -> Unit,
     onSubmitNewResourceClick: () -> Unit,
-    onSignOutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -110,14 +108,14 @@ fun ProfileAboutScreen(
         item {
             Column {
                 Text(
-                    text = "Profile & Cloud Settings",
+                    text = "Profile & App Settings",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Manage your diploma branch, Firebase cloud sync & web sharing",
+                    text = "Manage your diploma branch, local preferences & web sharing",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -169,26 +167,6 @@ fun ProfileAboutScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (!userEmail.isNullOrBlank()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Filled.CloudDone,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = userEmail,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
                             }
                         }
 
@@ -260,25 +238,6 @@ fun ProfileAboutScreen(
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    OutlinedButton(
-                        onClick = onSignOutClick,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("sign_out_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Sign Out",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sign Out of Google Account", fontWeight = FontWeight.SemiBold)
-                    }
                 }
             }
         }
@@ -298,7 +257,7 @@ fun ProfileAboutScreen(
                 StatCard(
                     title = "Bookmarks",
                     value = "$savedNotesCount",
-                    sub = "Cloud Synced",
+                    sub = "Saved Locally",
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(

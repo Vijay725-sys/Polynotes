@@ -74,9 +74,7 @@ private const val SHARED_WEB_APP_URL =
 class PolyNotesWebBridge(
     private val context: Context,
     private val viewModel: PolyNotesViewModel,
-    private val userEmail: String?,
-    private val onSwitchToNativeUi: () -> Unit,
-    private val onSignOut: () -> Unit
+    private val onSwitchToNativeUi: () -> Unit
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -90,7 +88,6 @@ class PolyNotesWebBridge(
         val isDark: Boolean = viewModel.isDarkMode.value
 
         val root = JSONObject()
-        root.put("userEmail", userEmail ?: "")
         root.put("isDarkMode", isDark)
 
         val profileObj = JSONObject().apply {
@@ -270,22 +267,13 @@ class PolyNotesWebBridge(
             onSwitchToNativeUi()
         }
     }
-
-    @JavascriptInterface
-    fun signOutUser() {
-        mainHandler.post {
-            onSignOut()
-        }
-    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun FullScreenWebAppScreen(
     viewModel: PolyNotesViewModel,
-    userEmail: String?,
     onSwitchToNativeUi: () -> Unit,
-    onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -443,9 +431,7 @@ fun FullScreenWebAppScreen(
                             PolyNotesWebBridge(
                                 context = ctx,
                                 viewModel = viewModel,
-                                userEmail = userEmail,
-                                onSwitchToNativeUi = onSwitchToNativeUi,
-                                onSignOut = onSignOut
+                                onSwitchToNativeUi = onSwitchToNativeUi
                             ),
                             "PolyNotesBridge"
                         )
